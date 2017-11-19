@@ -375,9 +375,13 @@ const (
 
 // A Package describes the Go package found in a directory.
 type Package struct {
-	Dir           string   // directory containing package sources
-	Name          string   // package name
-	ImportComment string   // path in import comment on package statement
+	Dir           string // directory containing package sources
+	Name          string // package name
+	ImportComment string // path in import comment on package statement
+
+	ProjectRoot  string //Ally: root of project that specify by package comment [//import "#"]
+	LocalPackage bool   //Ally: local packages that under ProjectRoot which uses [import "#/xxx"] style reference
+
 	Doc           string   // documentation synopsis
 	ImportPath    string   // import path of package ("" if unknown)
 	Root          string   // root of Go tree where this package lives
@@ -472,6 +476,11 @@ func nameExt(name string) string {
 	return name[i:]
 }
 
+//Ally: query parents packages than has package local project root comment: //import "#"
+func queryProjectRoot(path string) (root string, err error) {
+	return path, nil
+}
+
 // Import returns details about the Go package named by the import path,
 // interpreting local import paths relative to the srcDir directory.
 // If the path is a local import path naming a package that can be imported
@@ -495,6 +504,18 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 	if path == "" {
 		return p, fmt.Errorf("import %q: invalid import path", path)
 	}
+
+	if path[0] == '/' {
+		return p, fmt.Errorf("import %q: cannot import absolute path", path)
+	}
+
+	//never use relative path like ./xxx or ../xxx, use #/xxx insdead
+	if path[0] == '.' {
+		return p, fmt.Errorf("import %q: cannot import relative path, use #/xxx refering local packages", path)
+	}
+
+	//Ally: import by "#/xxx" style, local reference
+	var referByLocal = len(path) > 2 && path[:2] == "#/"
 
 	var pkgtargetroot string
 	var pkga string
@@ -824,9 +845,16 @@ Found:
 				if err != nil {
 					badFile(fmt.Errorf("%s:%d: cannot parse import comment", filename, line))
 				} else if p.ImportComment == "" {
-					p.ImportComment = com
-					firstCommentFile = name
-				} else if p.ImportComment != com {
+					if com == "#" { //Ally:root of project, root of local package
+						p.ProjectRoot = path
+						p.LocalPackage = true
+						firstCommentFile = name
+					} else {
+						p.ImportComment = com
+						firstCommentFile = name
+					}
+
+				} else if p.ImportComment != com || p.ProjectRoot != "" {
 					badFile(fmt.Errorf("found import comments %q (%s) and %q (%s) in %s", p.ImportComment, firstCommentFile, com, name, p.Dir))
 				}
 			}
