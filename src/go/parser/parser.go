@@ -2219,7 +2219,11 @@ type parseSpecFunction func(doc *ast.CommentGroup, keyword token.Token, iota int
 
 func isValidImport(lit string) bool {
 	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-	s, _ := strconv.Unquote(lit) // go/scanner returns a legal string literal
+
+	s, _ := strconv.Unquote(lit)     // go/scanner returns a legal string literal
+	if len(s) > 2 && s[:2] == "#/" { //Ally:import "#/foo" is valid style
+		s = s[2:]
+	}
 	for _, r := range s {
 		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
 			return false

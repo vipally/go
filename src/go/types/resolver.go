@@ -90,8 +90,12 @@ func validatedImportPath(path string) (string, error) {
 	if s == "" {
 		return "", fmt.Errorf("empty string")
 	}
+	sCheck := s
+	if len(sCheck) > 2 && sCheck[:2] == "#/" { //Ally:import "#/foo" is valid style
+		sCheck = sCheck[2:]
+	}
 	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-	for _, r := range s {
+	for _, r := range sCheck {
 		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
 			return s, fmt.Errorf("invalid character %#U", r)
 		}

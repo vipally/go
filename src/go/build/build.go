@@ -535,9 +535,9 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 		return p, fmt.Errorf("import %q: cannot import absolute path", path)
 	}
 	//never use relative path like ./xxx or ../xxx, use #/xxx insdead
-	if path[0] == '.' {
-		return p, fmt.Errorf("import %q: cannot import relative path, use #/xxx refering local packages", path)
-	}
+	//	if path[0] == '.' {
+	//		return p, fmt.Errorf("import %q: cannot import relative path, use #/xxx refering local packages", path)
+	//	}
 
 	var pkgtargetroot string
 	var pkga string
