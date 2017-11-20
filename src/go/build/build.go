@@ -874,7 +874,7 @@ Found:
 				} else if p.ImportComment == "" {
 					p.ImportComment = com
 					firstCommentFile = name
-				} else if p.ImportComment != com || p.ProjectRoot != "" {
+				} else if p.ImportComment != com {
 					badFile(fmt.Errorf("found import comments %q (%s) and %q (%s) in %s", p.ImportComment, firstCommentFile, com, name, p.Dir))
 				}
 			}
