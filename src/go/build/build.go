@@ -373,14 +373,29 @@ const (
 	IgnoreVendor
 )
 
+//Ally: import local package by "#/xxx" style
+func searchLocalRoot(curPath string) string {
+	//find any parent dir that contains "vendor" dir
+	for dir, dirSave := filepath.Clean(curDir), ""; dir != dirSave; dir, dirSave = filepath.Dir(dir), dir {
+		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) {
+			return dir
+		}
+	}
+	return ""
+}
+func isLocalImportStyle(path string) bool {
+	localStyle := len(path) > 2 && path[:2] == "#/"
+	return localStyle
+}
+
 // A Package describes the Go package found in a directory.
 type Package struct {
 	Dir           string // directory containing package sources
 	Name          string // package name
 	ImportComment string // path in import comment on package statement
 
-	ProjectRoot  string //Ally: root of project that specify by package comment [//import "#"]
-	LocalPackage bool   //Ally: local packages that under ProjectRoot which uses [import "#/xxx"] style reference
+	LocalRoot    string //Ally: root of local project(contains sub-directory "vendor")
+	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
 
 	Doc           string   // documentation synopsis
 	ImportPath    string   // import path of package ("" if unknown)
@@ -476,11 +491,6 @@ func nameExt(name string) string {
 	return name[i:]
 }
 
-//Ally: query parents packages than has package local project root comment: //import "#"
-func queryProjectRoot(path string) (root string, err error) {
-	return path, nil
-}
-
 // Import returns details about the Go package named by the import path,
 // interpreting local import paths relative to the srcDir directory.
 // If the path is a local import path naming a package that can be imported
@@ -504,18 +514,35 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 	if path == "" {
 		return p, fmt.Errorf("import %q: invalid import path", path)
 	}
-
 	if path[0] == '/' {
 		return p, fmt.Errorf("import %q: cannot import absolute path", path)
 	}
-
 	//never use relative path like ./xxx or ../xxx, use #/xxx insdead
 	if path[0] == '.' {
 		return p, fmt.Errorf("import %q: cannot import relative path, use #/xxx refering local packages", path)
 	}
 
-	//Ally: import by "#/xxx" style, local reference
-	var referByLocal = len(path) > 2 && path[:2] == "#/"
+	//Ally: import local package by "#/xxx" style
+	referedByLocalStyle := isLocalImportStyle(path)
+	if referedByLocalStyle {
+		if srcDir == "" {
+			return p, fmt.Errorf("import %q: import relative to unknown directory %q", path, srcDir)
+		}
+
+		localRoot := searchLocalRoot(srcDir)
+		if localRoot == "" {
+			return p, fmt.Errorf("import %q: cannot find local root(contains \"vendor\") up from %q", path, srcDir)
+		}
+		p.LocalRoot = localRoot
+		p.ImportPath = path[2:]
+		p.Dir = ctxt.joinPath(localRoot, p.ImportPath)
+		p.Root = localRoot
+
+		if ctxt.isDir(p.Dir) {
+			goto FOUND
+		}
+		return p, fmt.Errorf("cannot find package %q from %q", path, p.LocalRoot)
+	} //if referedByLocalStyle
 
 	var pkgtargetroot string
 	var pkga string
@@ -845,15 +872,8 @@ Found:
 				if err != nil {
 					badFile(fmt.Errorf("%s:%d: cannot parse import comment", filename, line))
 				} else if p.ImportComment == "" {
-					if com == "#" { //Ally:root of project, root of local package
-						p.ProjectRoot = path
-						p.LocalPackage = true
-						firstCommentFile = name
-					} else {
-						p.ImportComment = com
-						firstCommentFile = name
-					}
-
+					p.ImportComment = com
+					firstCommentFile = name
 				} else if p.ImportComment != com || p.ProjectRoot != "" {
 					badFile(fmt.Errorf("found import comments %q (%s) and %q (%s) in %s", p.ImportComment, firstCommentFile, com, name, p.Dir))
 				}
@@ -877,6 +897,16 @@ Found:
 				if err != nil {
 					log.Panicf("%s: parser returned invalid quoted string: <%s>", filename, quoted)
 				}
+
+				//Ally: import local package by "#/xxx" style
+				if localStyle := isLocalImportStyle(path); localStyle { //has local refered packages
+					p.LocalPackage = true
+					if !referedByLocalStyle { //error: reference local package from global style
+						badFile(fmt.Errorf("%s:%d: cannot import local-package %s from global style",
+							filename, quoted, p.Dir))
+					}
+				}
+
 				if isXTest {
 					xTestImported[path] = append(xTestImported[path], fset.Position(spec.Pos()))
 				} else if isTest {
