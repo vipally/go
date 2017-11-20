@@ -394,7 +394,7 @@ type Package struct {
 	Name          string // package name
 	ImportComment string // path in import comment on package statement
 
-	LocalRoot    string //Ally: root of local project(contains sub-directory "vendor")
+	LocalRoot    string //Ally: root of local project(which contains sub-directory "vendor")
 	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
 
 	Doc           string   // documentation synopsis

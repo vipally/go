@@ -37,15 +37,19 @@ type PackagePublic struct {
 	Dir           string `json:",omitempty"` // directory containing package sources
 	ImportPath    string `json:",omitempty"` // import path of package in dir
 	ImportComment string `json:",omitempty"` // path in import comment on package statement
-	Name          string `json:",omitempty"` // package name
-	Doc           string `json:",omitempty"` // package documentation string
-	Target        string `json:",omitempty"` // installed target for this package (may be executable)
-	Shlib         string `json:",omitempty"` // the shared library that contains this package (only set when -linkshared)
-	Goroot        bool   `json:",omitempty"` // is this package found in the Go root?
-	Standard      bool   `json:",omitempty"` // is this package part of the standard Go library?
-	Root          string `json:",omitempty"` // Go root or Go path dir containing this package
-	ConflictDir   string `json:",omitempty"` // Dir is hidden by this other directory
-	BinaryOnly    bool   `json:",omitempty"` // package cannot be recompiled
+
+	LocalRoot    string `json:",omitempty"` //Ally: root of local project(which contains sub-directory "vendor")
+	LocalPackage bool   `json:",omitempty"` //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
+
+	Name        string `json:",omitempty"` // package name
+	Doc         string `json:",omitempty"` // package documentation string
+	Target      string `json:",omitempty"` // installed target for this package (may be executable)
+	Shlib       string `json:",omitempty"` // the shared library that contains this package (only set when -linkshared)
+	Goroot      bool   `json:",omitempty"` // is this package found in the Go root?
+	Standard    bool   `json:",omitempty"` // is this package part of the standard Go library?
+	Root        string `json:",omitempty"` // Go root or Go path dir containing this package
+	ConflictDir string `json:",omitempty"` // Dir is hidden by this other directory
+	BinaryOnly  bool   `json:",omitempty"` // package cannot be recompiled
 
 	// Stale and StaleReason remain here *only* for the list command.
 	// They are only initialized in preparation for list execution.
