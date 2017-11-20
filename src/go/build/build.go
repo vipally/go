@@ -374,16 +374,33 @@ const (
 )
 
 //Ally: import local package by "#/xxx" style
-func searchLocalRoot(curPath string) string {
+
+// SearchLocalRoot find the first path up from curPath that contains sub-directory "vendor"
+// which is the root of local project.
+// It returns "" if not found.
+func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	//find any parent dir that contains "vendor" dir
-	for dir, dirSave := filepath.Clean(curDir), ""; dir != dirSave; dir, dirSave = filepath.Dir(dir), dir {
+	for dir, dirSave := filepath.Clean(curPath), ""; dir != dirSave; dir, dirSave = filepath.Dir(dir), dir {
 		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) {
 			return dir
 		}
 	}
 	return ""
 }
-func isLocalImportStyle(path string) bool {
+
+// GetLocalRootRelPath joins localRootPath and rootBasedPath
+// rootBasedPath must format as "#/foo"
+func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
+	if IsLocalRootRelImport(rootBasedPath) {
+		return filepath.ToSlash(filepath.Join(localRootPath, rootBasedPath[2:]))
+	}
+	return ""
+}
+
+// IsLocalRootRelImport reports whether the import path is
+// a local root related import path, like "#/foo"
+// "#"will be replaced with which contains sub-directory "vendor" up from current package path.
+func IsLocalRootRelImport(path string) bool {
 	localStyle := len(path) > 2 && path[:2] == "#/"
 	return localStyle
 }
@@ -522,28 +539,6 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 		return p, fmt.Errorf("import %q: cannot import relative path, use #/xxx refering local packages", path)
 	}
 
-	//Ally: import local package by "#/xxx" style
-	referedByLocalStyle := isLocalImportStyle(path)
-	if referedByLocalStyle {
-		if srcDir == "" {
-			return p, fmt.Errorf("import %q: import relative to unknown directory %q", path, srcDir)
-		}
-
-		localRoot := searchLocalRoot(srcDir)
-		if localRoot == "" {
-			return p, fmt.Errorf("import %q: cannot find local root(contains \"vendor\") up from %q", path, srcDir)
-		}
-		p.LocalRoot = localRoot
-		p.ImportPath = path[2:]
-		p.Dir = ctxt.joinPath(localRoot, p.ImportPath)
-		p.Root = localRoot
-
-		if ctxt.isDir(p.Dir) {
-			goto FOUND
-		}
-		return p, fmt.Errorf("cannot find package %q from %q", path, p.LocalRoot)
-	} //if referedByLocalStyle
-
 	var pkgtargetroot string
 	var pkga string
 	var pkgerr error
@@ -572,6 +567,29 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 	setPkga()
 
 	binaryOnly := false
+
+	//Ally: import local package by "#/xxx" style
+	referedByLocalStyle := IsLocalRootRelImport(path)
+	if referedByLocalStyle {
+		if srcDir == "" {
+			return p, fmt.Errorf("import %q: import relative to unknown directory %q", path, srcDir)
+		}
+
+		localRoot := ctxt.SearchLocalRoot(srcDir)
+		if localRoot == "" {
+			return p, fmt.Errorf("import %q: cannot find local root(contains \"vendor\") up from %q", path, srcDir)
+		}
+		p.LocalRoot = localRoot
+		p.ImportPath = path[2:]
+		p.Dir = ctxt.joinPath(localRoot, p.ImportPath)
+		p.Root = localRoot
+
+		if ctxt.isDir(p.Dir) {
+			goto Found
+		}
+		return p, fmt.Errorf("cannot find package %q from %q", path, p.LocalRoot)
+	} //if referedByLocalStyle
+
 	if IsLocalImport(path) {
 		pkga = "" // local imports have no installed path
 		if srcDir == "" {
@@ -899,11 +917,10 @@ Found:
 				}
 
 				//Ally: import local package by "#/xxx" style
-				if localStyle := isLocalImportStyle(path); localStyle { //has local refered packages
+				if localStyle := IsLocalImport(path); localStyle { //has local refered packages
 					p.LocalPackage = true
 					if !referedByLocalStyle { //error: reference local package from global style
-						badFile(fmt.Errorf("%s:%d: cannot import local-package %s from global style",
-							filename, quoted, p.Dir))
+						badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
 					}
 				}
 

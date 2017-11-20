@@ -38,9 +38,6 @@ type PackagePublic struct {
 	ImportPath    string `json:",omitempty"` // import path of package in dir
 	ImportComment string `json:",omitempty"` // path in import comment on package statement
 
-	LocalRoot    string `json:",omitempty"` //Ally: root of local project(which contains sub-directory "vendor")
-	LocalPackage bool   `json:",omitempty"` //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
-
 	Name        string `json:",omitempty"` // package name
 	Doc         string `json:",omitempty"` // package documentation string
 	Target      string `json:",omitempty"` // installed target for this package (may be executable)
@@ -98,18 +95,22 @@ type PackagePublic struct {
 type PackageInternal struct {
 	// Unexported fields are not part of the public API.
 	Build        *build.Package
-	Imports      []*Package           // this package's direct imports
-	RawImports   []string             // this package's original imports as they appear in the text of the program
-	ForceLibrary bool                 // this package is a library (even if named "main")
-	CmdlineFiles bool                 // package built from files listed on command line
-	CmdlinePkg   bool                 // package listed on command line
-	Local        bool                 // imported via local path (./ or ../)
-	LocalPrefix  string               // interpret ./ and ../ imports relative to this prefix
-	ExeName      string               // desired name for temporary executable
-	CoverMode    string               // preprocess Go source files with the coverage tool in this mode
-	CoverVars    map[string]*CoverVar // variables created by coverage analysis
-	OmitDebug    bool                 // tell linker not to write debug information
-	GobinSubdir  bool                 // install target would be subdir of GOBIN
+	Imports      []*Package // this package's direct imports
+	RawImports   []string   // this package's original imports as they appear in the text of the program
+	ForceLibrary bool       // this package is a library (even if named "main")
+	CmdlineFiles bool       // package built from files listed on command line
+	CmdlinePkg   bool       // package listed on command line
+
+	LocalRoot    string //Ally: root of local project(which contains sub-directory "vendor")
+	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
+	Local        bool   // imported via local path (./ or ../)
+	LocalPrefix  string // interpret ./ and ../ imports relative to this prefix
+
+	ExeName     string               // desired name for temporary executable
+	CoverMode   string               // preprocess Go source files with the coverage tool in this mode
+	CoverVars   map[string]*CoverVar // variables created by coverage analysis
+	OmitDebug   bool                 // tell linker not to write debug information
+	GobinSubdir bool                 // install target would be subdir of GOBIN
 
 	Asmflags   []string // -asmflags for this package
 	Gcflags    []string // -gcflags for this package
@@ -229,6 +230,9 @@ func (p *Package) copyBuild(pp *build.Package) {
 		p.TestImports = nil
 		p.XTestImports = nil
 	}
+
+	p.Internal.LocalPackage = pp.LocalPackage
+	p.Internal.LocalRoot = pp.LocalRoot
 }
 
 // isStandardImportPath reports whether $GOROOT/src/path should be considered
@@ -387,9 +391,13 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	importPath := path
 	origPath := path
 	isLocal := build.IsLocalImport(path)
+	isLocalRootRelImport := build.IsLocalRootRelImport(path)
 	var debugDeprecatedImportcfgDir string
 	if isLocal {
 		importPath = dirToImportPath(filepath.Join(srcDir, path))
+	} else if isLocalRootRelImport {
+		localRoot := cfg.BuildContext.SearchLocalRoot(srcDir)
+		importPath = build.GetLocalRootRelatedPath(localRoot, path)
 	} else if DebugDeprecatedImportcfg.enabled {
 		if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
 			debugDeprecatedImportcfgDir = d
