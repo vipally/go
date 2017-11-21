@@ -405,16 +405,16 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 // GetLocalRootRelPath joins localRootPath and rootBasedPath
 // rootBasedPath must format as "#/foo"
 func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
-	if IsLocalRootRelImport(rootBasedPath) {
+	if IsLocalRootBasedImport(rootBasedPath) {
 		return filepath.ToSlash(filepath.Join(localRootPath, rootBasedPath[2:]))
 	}
 	return ""
 }
 
-// IsLocalRootRelImport reports whether the import path is
+// IsLocalRootBasedImport reports whether the import path is
 // a local root related import path, like "#/foo"
 // "#"will be replaced with which contains sub-directory "vendor" up from current package path.
-func IsLocalRootRelImport(path string) bool {
+func IsLocalRootBasedImport(path string) bool {
 	localStyle := len(path) > 2 && path[:2] == "#/"
 	return localStyle
 }
@@ -583,10 +583,10 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 	binaryOnly := false
 
 	//Ally: import local package by "#/xxx" style
-	referedByLocalStyle := IsLocalRootRelImport(path)
+	referedByLocalStyle := IsLocalRootBasedImport(path)
 	if referedByLocalStyle {
 		if srcDir == "" {
-			return p, fmt.Errorf("import %q: import relative to unknown directory %s", path, srcDir)
+			return p, fmt.Errorf("import %q: import local package to unknown directory %s", path, srcDir)
 		}
 
 		localRoot := ctxt.SearchLocalRoot(srcDir)

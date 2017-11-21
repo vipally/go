@@ -391,7 +391,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	importPath := path
 	origPath := path
 	isLocal := build.IsLocalImport(path)
-	isLocalRootRelImport := build.IsLocalRootRelImport(path)
+	isLocalRootRelImport := build.IsLocalRootBasedImport(path)
 	var debugDeprecatedImportcfgDir string
 	if isLocal {
 		importPath = dirToImportPath(filepath.Join(srcDir, path))
@@ -418,7 +418,12 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	} else {
 		p = new(Package)
 		p.Internal.Local = isLocal
-		p.ImportPath = importPath
+		if isLocalRootRelImport {
+			p.ImportPath = path[2:] //path = "#/..."
+		} else {
+			p.ImportPath = importPath
+		}
+
 		packageCache[importPath] = p
 
 		// Load package.
@@ -436,7 +441,11 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			}
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
-		bp.ImportPath = importPath
+		if isLocalRootRelImport {
+			bp.ImportPath = path[2:] //path = "#/..."
+		} else {
+			bp.ImportPath = importPath
+		}
 		if cfg.GOBIN != "" {
 			bp.BinDir = cfg.GOBIN
 		}
