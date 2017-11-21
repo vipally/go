@@ -1977,7 +1977,11 @@ func isbadimport(path string, allowSpace bool) bool {
 		}
 	}
 
-	for _, r := range path {
+	check := path
+	if len(check) > 2 && check[:2] == "#/" { // Ally: "#/..." is valid
+		check = check[2:]
+	}
+	for _, r := range check {
 		if r == utf8.RuneError {
 			yyerror("import path contains invalid UTF-8 sequence: %q", path)
 			return true
