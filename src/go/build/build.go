@@ -796,15 +796,6 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 	}
 
 Found:
-	if p.Root != "" {
-		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
-		p.BinDir = ctxt.joinPath(p.Root, "bin")
-		if pkga != "" {
-			p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
-			p.PkgObj = ctxt.joinPath(p.Root, pkga)
-		}
-	}
 
 	// If it's a local import path, by the time we get here, we still haven't checked
 	// that p.Dir directory exists. This is the right time to do that check.
@@ -1048,6 +1039,32 @@ Found:
 		sort.Strings(p.SFiles)
 	}
 
+	//Ally: main package may refered by global-style
+	if p.LocalPackage && p.LocalRoot == "" {
+		localRoot := ctxt.SearchLocalRoot(srcDir)
+		if localRoot == "" {
+			return p, fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, path, srcDir)
+		}
+		p.LocalRoot = localRoot
+
+		//p.Dir = ctxt.joinPath(localRoot, "src", p.ImportPath)
+		p.Root = localRoot
+		p.SrcRoot = ctxt.joinPath(p.Root, "src")
+		p.ImportPath, _ = filepath.Rel(p.SrcRoot, p.Dir)
+		p.ImportPath = filepath.ToSlash(p.ImportPath)
+	}
+
+	if p.Root != "" {
+		p.SrcRoot = ctxt.joinPath(p.Root, "src")
+		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
+		p.BinDir = ctxt.joinPath(p.Root, "bin")
+		if pkga != "" {
+			p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
+			p.PkgObj = ctxt.joinPath(p.Root, pkga)
+		}
+	}
+
+	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot)
 	return p, pkgerr
 }
 

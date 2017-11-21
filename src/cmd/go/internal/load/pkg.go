@@ -960,6 +960,7 @@ func (p *Package) load(stk *ImportStack, bp *build.Package, err error) {
 		if p.Target != "" && cfg.BuildContext.GOOS == "windows" {
 			p.Target += ".exe"
 		}
+		//fmt.Printf("load %s target=%s elem=%s BinDir=%s\n", p.Dir, p.Target, elem, p.Internal.Build.BinDir)
 	} else if p.Internal.Local {
 		// Local import turned into absolute path.
 		// No permanent install target.
