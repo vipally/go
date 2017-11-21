@@ -395,7 +395,7 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
 		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) && strings.HasSuffix(dir, "src") {
 			if root, name := filepath.Split(dir); name == "src" {
-				return root
+				return filepath.Clean(root)
 			}
 		}
 	}
@@ -411,8 +411,8 @@ func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
 	return ""
 }
 
-// GetRelatedImoprt conver #/xxx or xxx to xxx
-func GetRelatedImportPath(imported string) string {
+// GetLocalRootRelatedImportPath conver #/x/y/z to x/y/z
+func GetLocalRootRelatedImportPath(imported string) string {
 	if len(imported) > 2 && imported[:2] == "#/" { //Ally:import "#/foo" is valid style
 		imported = imported[2:]
 	}
@@ -576,7 +576,7 @@ func nameExt(name string) string {
 //
 func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Package, error) {
 	p := &Package{
-		ImportPath: path,
+		ImportPath: GetLocalRootRelatedImportPath(path), //Ally: conver #/x/y/z to x/y/z
 	}
 	if path == "" {
 		return p, fmt.Errorf("import %q: invalid import path", path)

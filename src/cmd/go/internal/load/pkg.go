@@ -102,7 +102,7 @@ type PackageInternal struct {
 	CmdlinePkg   bool       // package listed on command line
 
 	LocalRoot    string //Ally: root of local project(which contains sub-directory "vendor")
-	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
+	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference or with [import "#"] comment
 	Local        bool   // imported via local path (./ or ../)
 	LocalPrefix  string // interpret ./ and ../ imports relative to this prefix
 
@@ -487,6 +487,15 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	}
 
 	if p.Internal.Local && parent != nil && !parent.Internal.Local {
+		perr := *p
+		perr.Error = &PackageError{
+			ImportStack: stk.Copy(),
+			Err:         fmt.Sprintf("local import %q in non-local package", path),
+		}
+		return setErrorPos(&perr, importPos)
+	}
+
+	if p.Internal.LocalPackage && parent != nil && !parent.Internal.LocalPackage {
 		perr := *p
 		perr.Error = &PackageError{
 			ImportStack: stk.Copy(),
