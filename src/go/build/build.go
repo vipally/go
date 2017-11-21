@@ -375,14 +375,28 @@ const (
 
 //Ally: import local package by "#/xxx" style
 
-// SearchLocalRoot find the first path up from curPath that contains sub-directory "vendor"
+// SearchLocalRoot find the parent of path that contains sub-directory "vendor" up from curPath
 // which is the root of local project.
 // It returns "" if not found.
+// The expected working tree of LocalRoot is:
+//	LocalRoot
+//	│
+//	├─bin
+//	├─pkg
+//	└─src
+//	    │  ...
+//	    │
+//	    ├─vendor
+//	    │      ...
+//	    │
+//	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	//find any parent dir that contains "vendor" dir
-	for dir, dirSave := filepath.Clean(curPath), ""; dir != dirSave; dir, dirSave = filepath.Dir(dir), dir {
-		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) {
-			return dir
+	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
+		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) && strings.HasSuffix(dir, "src") {
+			if root, name := filepath.Split(dir); name == "src" {
+				return root
+			}
 		}
 	}
 	return ""
@@ -572,22 +586,23 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 	referedByLocalStyle := IsLocalRootRelImport(path)
 	if referedByLocalStyle {
 		if srcDir == "" {
-			return p, fmt.Errorf("import %q: import relative to unknown directory %q", path, srcDir)
+			return p, fmt.Errorf("import %q: import relative to unknown directory %s", path, srcDir)
 		}
 
 		localRoot := ctxt.SearchLocalRoot(srcDir)
 		if localRoot == "" {
-			return p, fmt.Errorf("import %q: cannot find local root(contains \"vendor\") up from %q", path, srcDir)
+			return p, fmt.Errorf(`import %q: cannot find local root(with tree "<root>/src/vendor") up from %s`, path, srcDir)
 		}
 		p.LocalRoot = localRoot
 		p.ImportPath = path[2:]
-		p.Dir = ctxt.joinPath(localRoot, p.ImportPath)
+		p.Dir = ctxt.joinPath(localRoot, "src", p.ImportPath)
 		p.Root = localRoot
 
 		if ctxt.isDir(p.Dir) {
 			goto Found
 		}
-		return p, fmt.Errorf("cannot find package %q from %q", path, p.LocalRoot)
+
+		return p, fmt.Errorf("import %q: cannot find package from %s", path, p.LocalRoot)
 	} //if referedByLocalStyle
 
 	if IsLocalImport(path) {
