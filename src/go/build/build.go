@@ -411,6 +411,53 @@ func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
 	return ""
 }
 
+// GetRelatedImoprt conver #/xxx or xxx to xxx
+func GetRelatedImportPath(imported string) string {
+	if len(imported) > 2 && imported[:2] == "#/" { //Ally:import "#/foo" is valid style
+		imported = imported[2:]
+	}
+	return imported
+}
+
+// IsValidImport verify if imported is a valid import string
+// #/... style is valid.
+func IsValidImport(imported string) bool {
+	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+
+	s, _ := strconv.Unquote(imported) // go/scanner returns a legal string literal
+	if len(s) > 2 && s[:2] == "#/" {  //Ally:import "#/foo" is valid style
+		s = s[2:]
+	}
+	for _, r := range s {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+			return false
+		}
+	}
+	return s != ""
+}
+
+// ValidateImportPath returns Unquote of path if valid
+func ValidateImportPath(path string) (string, error) {
+	s, err := strconv.Unquote(path)
+	if err != nil {
+		return "", err
+	}
+	if s == "" {
+		return "", fmt.Errorf("empty string")
+	}
+	sCheck := s
+	if len(sCheck) > 2 && sCheck[:2] == "#/" { //Ally:import "#/foo" is valid style
+		sCheck = sCheck[2:]
+	}
+	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+	for _, r := range sCheck {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+			return s, fmt.Errorf("invalid character %#U", r)
+		}
+	}
+	return s, nil
+}
+
 // IsLocalRootBasedImport reports whether the import path is
 // a local root related import path, like "#/foo"
 // "#"will be replaced with which contains sub-directory "vendor" up from current package path.
@@ -905,9 +952,18 @@ Found:
 				if err != nil {
 					badFile(fmt.Errorf("%s:%d: cannot parse import comment", filename, line))
 				} else if p.ImportComment == "" {
-					p.ImportComment = com
-					firstCommentFile = name
-				} else if p.ImportComment != com {
+					if com == "#" { //Ally: package comment with "#" means that this a local-package
+						p.LocalPackage = true
+						if !referedByLocalStyle && p.Name != "main" { //error: reference local package from global style
+							badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
+						}
+						//p.ImportComment = com
+						firstCommentFile = name
+					} else {
+						p.ImportComment = com
+						firstCommentFile = name
+					}
+				} else if p.ImportComment != com || p.LocalPackage {
 					badFile(fmt.Errorf("found import comments %q (%s) and %q (%s) in %s", p.ImportComment, firstCommentFile, com, name, p.Dir))
 				}
 			}
@@ -932,9 +988,9 @@ Found:
 				}
 
 				//Ally: import local package by "#/xxx" style
-				if localStyle := IsLocalImport(path); localStyle { //has local refered packages
+				if localStyle := IsLocalRootBasedImport(path); localStyle { //has local refered packages
 					p.LocalPackage = true
-					if !referedByLocalStyle { //error: reference local package from global style
+					if !referedByLocalStyle && p.Name != "main" { //error: reference local package from global style
 						badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
 					}
 				}
