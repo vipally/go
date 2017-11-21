@@ -2217,7 +2217,9 @@ func (p *parser) parseStmt() (s ast.Stmt) {
 
 type parseSpecFunction func(doc *ast.CommentGroup, keyword token.Token, iota int) ast.Spec
 
-func isValidImport(lit string) bool {
+// IsValidImport verify if imported is a valid import string
+// #/... style is valid.
+func IsValidImport(lit string) bool {
 	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
 
 	s, _ := strconv.Unquote(lit)     // go/scanner returns a legal string literal
@@ -2250,7 +2252,7 @@ func (p *parser) parseImportSpec(doc *ast.CommentGroup, _ token.Token, _ int) as
 	var path string
 	if p.tok == token.STRING {
 		path = p.lit
-		if !isValidImport(path) {
+		if !IsValidImport(path) {
 			p.error(pos, "invalid import path: "+path)
 		}
 		p.next()

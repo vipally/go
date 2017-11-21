@@ -421,20 +421,9 @@ func GetRelatedImportPath(imported string) string {
 
 // IsValidImport verify if imported is a valid import string
 // #/... style is valid.
-func IsValidImport(imported string) bool {
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-
-	s, _ := strconv.Unquote(imported) // go/scanner returns a legal string literal
-	if len(s) > 2 && s[:2] == "#/" {  //Ally:import "#/foo" is valid style
-		s = s[2:]
-	}
-	for _, r := range s {
-		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
-			return false
-		}
-	}
-	return s != ""
-}
+//func IsValidImport(imported string) bool {
+//	return parser.IsValidImport(imported)
+//}
 
 // ValidateImportPath returns Unquote of path if valid
 func ValidateImportPath(path string) (string, error) {
