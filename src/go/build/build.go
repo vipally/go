@@ -934,7 +934,9 @@ Found:
 				} else if p.ImportComment == "" {
 					if com == "#" { //Ally: package comment with "#" means that this a local-package
 						p.LocalPackage = true
-						if !referedByLocalStyle && p.Name != "main" { //error: reference local package from global style
+						// error: reference local package from global style
+						// Refer from self path is valid.
+						if !referedByLocalStyle && p.Dir != srcDir {
 							badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
 						}
 						//p.ImportComment = com
@@ -962,27 +964,29 @@ Found:
 					continue
 				}
 				quoted := spec.Path.Value
-				path, err := strconv.Unquote(quoted)
+				importedPath, err := strconv.Unquote(quoted)
 				if err != nil {
 					log.Panicf("%s: parser returned invalid quoted string: <%s>", filename, quoted)
 				}
 
 				//Ally: import local package by "#/xxx" style
-				if localStyle := IsLocalRootBasedImport(path); localStyle { //has local refered packages
+				if localStyle := IsLocalRootBasedImport(importedPath); localStyle { //has local refered packages
 					p.LocalPackage = true
-					if !referedByLocalStyle && p.Name != "main" { //error: reference local package from global style
+					// error: reference local package from global style
+					// Refer from self path is valid.
+					if !referedByLocalStyle && p.Dir != srcDir {
 						badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
 					}
 				}
 
 				if isXTest {
-					xTestImported[path] = append(xTestImported[path], fset.Position(spec.Pos()))
+					xTestImported[importedPath] = append(xTestImported[importedPath], fset.Position(spec.Pos()))
 				} else if isTest {
-					testImported[path] = append(testImported[path], fset.Position(spec.Pos()))
+					testImported[importedPath] = append(testImported[importedPath], fset.Position(spec.Pos()))
 				} else {
-					imported[path] = append(imported[path], fset.Position(spec.Pos()))
+					imported[importedPath] = append(imported[importedPath], fset.Position(spec.Pos()))
 				}
-				if path == "C" {
+				if importedPath == "C" {
 					if isTest {
 						badFile(fmt.Errorf("use of cgo in test %s not supported", filename))
 					} else {
