@@ -575,6 +575,7 @@ func nameExt(name string) string {
 // *Package containing partial information.
 //
 func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Package, error) {
+	//fmt.Println("Import", path, srcDir, mode)
 	p := &Package{
 		ImportPath: GetLocalRootRelatedImportPath(path), //Ally: conver #/x/y/z to x/y/z
 	}
@@ -618,6 +619,13 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 
 	binaryOnly := false
 
+	searchLocalRoot := func() string {
+		if p.LocalRoot == "" {
+			p.LocalRoot = ctxt.SearchLocalRoot(srcDir)
+		}
+		return p.LocalRoot
+	}
+
 	//Ally: import local package by "#/xxx" style
 	referedByLocalStyle := IsLocalRootBasedImport(path)
 	if referedByLocalStyle {
@@ -625,17 +633,23 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 			return p, fmt.Errorf("import %q: import local package to unknown directory %s", path, srcDir)
 		}
 
-		localRoot := ctxt.SearchLocalRoot(srcDir)
-		if localRoot == "" {
+		if searchLocalRoot() == "" {
 			return p, fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, path, srcDir)
 		}
-		p.LocalRoot = localRoot
 		p.ImportPath = path[2:]
-		p.Dir = ctxt.joinPath(localRoot, "src", p.ImportPath)
-		p.Root = localRoot
+		p.Dir = ctxt.joinPath(p.LocalRoot, "src", p.ImportPath)
+		p.Root = p.LocalRoot
 
 		if ctxt.isDir(p.Dir) {
 			goto Found
+		}
+
+		//local vendor
+		if mode&IgnoreVendor == 0 && srcDir != "" {
+			if vendor := ctxt.joinPath(p.LocalRoot, "src", "vendor", p.ImportPath); ctxt.isDir(p.Dir) {
+				p.Dir = vendor
+				goto Found
+			}
 		}
 
 		return p, fmt.Errorf("import %q: cannot find package from %s", path, p.LocalRoot)
@@ -737,6 +751,13 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				}
 				return false
 			}
+			//search local vendor first
+			if localRoot := ctxt.SearchLocalRoot(srcDir); localRoot != "" {
+				if searchVendor(localRoot, false) {
+					p.Root = localRoot
+					goto Found
+				}
+			}
 			if searchVendor(ctxt.GOROOT, true) {
 				goto Found
 			}
@@ -771,6 +792,18 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 			}
 			tried.gopath = append(tried.gopath, dir)
 		}
+		//Ally: search local root
+		if localRoot := searchLocalRoot(); localRoot != "" {
+			dir := ctxt.joinPath(localRoot, "src", path)
+			isDir := ctxt.isDir(dir)
+			binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(localRoot, pkga))
+			if isDir || binaryOnly {
+				p.Dir = dir
+				p.Root = localRoot
+				goto Found
+			}
+			tried.gopath = append(tried.gopath, dir)
+		}
 
 		// package was not found
 		var paths []string
@@ -792,6 +825,7 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 		if len(tried.gopath) == 0 {
 			paths = append(paths, "\t($GOPATH not set. For more details see: 'go help gopath')")
 		}
+
 		return p, fmt.Errorf("cannot find package %q in any of:\n%s", path, strings.Join(paths, "\n"))
 	}
 
@@ -934,6 +968,7 @@ Found:
 				} else if p.ImportComment == "" {
 					if com == "#" { //Ally: package comment with "#" means that this a local-package
 						p.LocalPackage = true
+						searchLocalRoot()
 						// error: reference local package from global style
 						// Refer from self path is valid.
 						if !referedByLocalStyle && p.Dir != srcDir {
@@ -972,6 +1007,7 @@ Found:
 				//Ally: import local package by "#/xxx" style
 				if localStyle := IsLocalRootBasedImport(importedPath); localStyle { //has local refered packages
 					p.LocalPackage = true
+					searchLocalRoot()
 					// error: reference local package from global style
 					// Refer from self path is valid.
 					if !referedByLocalStyle && p.Dir != srcDir {
@@ -1043,13 +1079,13 @@ Found:
 		sort.Strings(p.SFiles)
 	}
 
-	//Ally: main package may refered by global-style
-	if p.LocalPackage && p.LocalRoot == "" {
-		localRoot := ctxt.SearchLocalRoot(srcDir)
+	//Ally: local main package may refered by global-style
+	//update path info first
+	if p.LocalPackage {
+		localRoot := searchLocalRoot()
 		if localRoot == "" {
 			return p, fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, path, srcDir)
 		}
-		p.LocalRoot = localRoot
 
 		//p.Dir = ctxt.joinPath(localRoot, "src", p.ImportPath)
 		p.Root = localRoot
