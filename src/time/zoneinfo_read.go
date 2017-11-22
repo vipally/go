@@ -33,12 +33,12 @@ const (
 )
 
 // Simple I/O interface to binary blob of data.
-type data struct {
+type dataIO struct {
 	p     []byte
 	error bool
 }
 
-func (d *data) read(n int) []byte {
+func (d *dataIO) read(n int) []byte {
 	if len(d.p) < n {
 		d.p = nil
 		d.error = true
@@ -49,7 +49,7 @@ func (d *data) read(n int) []byte {
 	return p
 }
 
-func (d *data) big4() (n uint32, ok bool) {
+func (d *dataIO) big4() (n uint32, ok bool) {
 	p := d.read(4)
 	if len(p) < 4 {
 		d.error = true
@@ -58,7 +58,7 @@ func (d *data) big4() (n uint32, ok bool) {
 	return uint32(p[0])<<24 | uint32(p[1])<<16 | uint32(p[2])<<8 | uint32(p[3]), true
 }
 
-func (d *data) byte() (n byte, ok bool) {
+func (d *dataIO) byte() (n byte, ok bool) {
 	p := d.read(1)
 	if len(p) < 1 {
 		d.error = true
@@ -79,11 +79,12 @@ func byteString(p []byte) string {
 
 var badData = errors.New("malformed time zone information")
 
-// newLocationFromTzinfo returns the Location described by Tzinfo with the given name.
-// The expected format for Tzinfo is that of a timezone file as they are found in the
-// the IANA Time Zone database.
-func newLocationFromTzinfo(name string, Tzinfo []byte) (*Location, error) {
-	d := data{Tzinfo, false}
+// LoadLocationFromTZData returns a Location with the given name
+// initialized from the IANA Time Zone database-formatted data.
+// The data should be in the format of a standard IANA time zone file
+// (for example, the content of /etc/localtime on Unix systems).
+func LoadLocationFromTZData(name string, data []byte) (*Location, error) {
+	d := dataIO{data, false}
 
 	// 4-byte magic "TZif"
 	if magic := d.read(4); string(magic) != "TZif" {
@@ -121,13 +122,13 @@ func newLocationFromTzinfo(name string, Tzinfo []byte) (*Location, error) {
 	}
 
 	// Transition times.
-	txtimes := data{d.read(n[NTime] * 4), false}
+	txtimes := dataIO{d.read(n[NTime] * 4), false}
 
 	// Time zone indices for transition times.
 	txzones := d.read(n[NTime])
 
 	// Zone info structures
-	zonedata := data{d.read(n[NZone] * 6), false}
+	zonedata := dataIO{d.read(n[NZone] * 6), false}
 
 	// Time zone abbreviations.
 	abbrev := d.read(n[NChar])
@@ -390,7 +391,7 @@ func loadLocation(name string, sources []string) (z *Location, firstErr error) {
 	for _, source := range sources {
 		var zoneData, err = loadTzinfo(name, source)
 		if err == nil {
-			if z, err = newLocationFromTzinfo(name, zoneData); err == nil {
+			if z, err = LoadLocationFromTZData(name, zoneData); err == nil {
 				return z, nil
 			}
 		}

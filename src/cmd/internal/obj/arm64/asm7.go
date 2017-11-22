@@ -579,6 +579,9 @@ var optab = []Optab{
 	{ASHA1SU0, C_ARNG, C_ARNG, C_ARNG, 1, 4, 0, 0, 0},
 	{ASHA256H, C_ARNG, C_VREG, C_VREG, 1, 4, 0, 0, 0},
 	{AVADDP, C_ARNG, C_ARNG, C_ARNG, 72, 4, 0, 0, 0},
+	{AVADD, C_ARNG, C_ARNG, C_ARNG, 72, 4, 0, 0, 0},
+	{AVADD, C_VREG, C_VREG, C_VREG, 89, 4, 0, 0, 0},
+	{AVADD, C_VREG, C_NONE, C_VREG, 89, 4, 0, 0, 0},
 	{AVLD1, C_ZOREG, C_NONE, C_LIST, 81, 4, 0, 0, 0},
 	{AVLD1, C_LOREG, C_NONE, C_LIST, 81, 4, 0, 0, C_XPOST},
 	{AVMOV, C_ELEM, C_NONE, C_REG, 73, 4, 0, 0, 0},
@@ -607,12 +610,20 @@ var optab = []Optab{
  * valid pstate field values, and value to use in instruction
  */
 var pstatefield = []struct {
-	a uint32
-	b uint32
+	reg int16
+	enc uint32
 }{
 	{REG_SPSel, 0<<16 | 4<<12 | 5<<5},
 	{REG_DAIFSet, 3<<16 | 4<<12 | 6<<5},
 	{REG_DAIFClr, 3<<16 | 4<<12 | 7<<5},
+}
+
+// the System register values, and value to use in instruction
+var systemreg = []struct {
+	reg int16
+	enc uint32
+}{
+	{REG_ELR_EL1, 8<<16 | 4<<12 | 1<<5},
 }
 
 func span7(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
@@ -2055,8 +2066,10 @@ func buildop(ctxt *obj.Link) {
 			oprangeset(AVAND, t)
 			oprangeset(AVCMEQ, t)
 			oprangeset(AVORR, t)
-			oprangeset(AVADD, t)
 			oprangeset(AVEOR, t)
+
+		case AVADD:
+			oprangeset(AVSUB, t)
 
 		case AAESD:
 			oprangeset(AAESE, t)
@@ -2075,6 +2088,9 @@ func buildop(ctxt *obj.Link) {
 		case ASHA1SU0:
 			oprangeset(ASHA256SU1, t)
 
+		case AVADDV:
+			oprangeset(AVUADDLV, t)
+
 		case ASHA1H,
 			AVMOV,
 			AVLD1,
@@ -2082,7 +2098,6 @@ func buildop(ctxt *obj.Link) {
 			AVST1,
 			AVDUP,
 			AVMOVS,
-			AVADDV,
 			AVMOVI:
 			break
 
@@ -2745,21 +2760,41 @@ func (c *ctxt7) asmout(p *obj.Prog, o *Optab, out []uint32) {
 	case 35: /* mov SPR,R -> mrs */
 		o1 = c.oprrr(p, AMRS)
 
-		v := int32(p.From.Offset)
+		v := uint32(0)
+		for i := 0; i < len(systemreg); i++ {
+			if systemreg[i].reg == p.From.Reg {
+				v = systemreg[i].enc
+				break
+			}
+		}
+		if v == 0 {
+			c.ctxt.Diag("illegal system register:\n%v", p)
+		}
 		if (o1 & uint32(v&^(3<<19))) != 0 {
 			c.ctxt.Diag("MRS register value overlap\n%v", p)
 		}
-		o1 |= uint32(v)
+
+		o1 |= v
 		o1 |= uint32(p.To.Reg & 31)
 
 	case 36: /* mov R,SPR */
 		o1 = c.oprrr(p, AMSR)
 
-		v := int32(p.To.Offset)
+		v := uint32(0)
+		for i := 0; i < len(systemreg); i++ {
+			if systemreg[i].reg == p.To.Reg {
+				v = systemreg[i].enc
+				break
+			}
+		}
+		if v == 0 {
+			c.ctxt.Diag("illegal system register:\n%v", p)
+		}
 		if (o1 & uint32(v&^(3<<19))) != 0 {
 			c.ctxt.Diag("MSR register value overlap\n%v", p)
 		}
-		o1 |= uint32(v)
+
+		o1 |= v
 		o1 |= uint32(p.From.Reg & 31)
 
 	case 37: /* mov $con,PSTATEfield -> MSR [immediate] */
@@ -2768,10 +2803,10 @@ func (c *ctxt7) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		}
 		o1 = c.opirr(p, AMSR)
 		o1 |= uint32((p.From.Offset & 0xF) << 8) /* Crm */
-		v := int32(0)
+		v := uint32(0)
 		for i := 0; i < len(pstatefield); i++ {
-			if int64(pstatefield[i].a) == p.To.Offset {
-				v = int32(pstatefield[i].b)
+			if pstatefield[i].reg == p.To.Reg {
+				v = pstatefield[i].enc
 				break
 			}
 		}
@@ -2779,7 +2814,7 @@ func (c *ctxt7) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		if v == 0 {
 			c.ctxt.Diag("illegal PSTATE field for immediate move\n%v", p)
 		}
-		o1 |= uint32(v)
+		o1 |= v
 
 	case 38: /* clrex [$imm] */
 		o1 = c.opimm(p, p.As)
@@ -3584,7 +3619,7 @@ func (c *ctxt7) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		o1 |= uint32(p.From.Offset)
 		o1 |= uint32(r&31) << 5
 
-	case 85: /* vaddv Vn.<T>, Vd*/
+	case 85: /* vaddv/vuaddlv Vn.<T>, Vd*/
 		af := int((p.From.Reg >> 5) & 15)
 		o1 = c.oprrr(p, p.As)
 		rf := int((p.From.Reg) & 31)
@@ -3652,6 +3687,27 @@ func (c *ctxt7) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		rel.Add = p.From.Offset
 		rel.Type = objabi.R_ADDRARM64
 		o3 |= 2<<30 | 5<<27 | 2<<23 | 1<<22 | uint32(p.To.Offset&31)<<10 | (REGTMP&31)<<5 | uint32(p.To.Reg&31)
+
+	case 89: /* vadd/vsub Vm, Vn, Vd */
+		switch p.As {
+		case AVADD:
+			o1 = 5<<28 | 7<<25 | 7<<21 | 1<<15 | 1<<10
+
+		case AVSUB:
+			o1 = 7<<28 | 7<<25 | 7<<21 | 1<<15 | 1<<10
+
+		default:
+			c.ctxt.Diag("bad opcode: %v\n", p)
+			break
+		}
+
+		rf := int(p.From.Reg)
+		rt := int(p.To.Reg)
+		r := int(p.Reg)
+		if r == 0 {
+			r = rt
+		}
+		o1 |= (uint32(rf&31) << 16) | (uint32(r&31) << 5) | uint32(rt&31)
 
 	// This is supposed to be something that stops execution.
 	// It's not supposed to be reached, ever, but if it is, we'd
@@ -4217,6 +4273,9 @@ func (c *ctxt7) oprrr(p *obj.Prog, a obj.As) uint32 {
 
 	case AVADDV:
 		return 7<<25 | 3<<20 | 3<<15 | 7<<11
+
+	case AVUADDLV:
+		return 1<<29 | 7<<25 | 3<<20 | 7<<11
 	}
 
 	c.ctxt.Diag("%v: bad rrr %d %v", p, a, a)
