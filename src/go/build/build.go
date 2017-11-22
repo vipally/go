@@ -426,26 +426,26 @@ func GetLocalRootRelatedImportPath(imported string) string {
 //}
 
 // ValidateImportPath returns Unquote of path if valid
-func ValidateImportPath(path string) (string, error) {
-	s, err := strconv.Unquote(path)
-	if err != nil {
-		return "", err
-	}
-	if s == "" {
-		return "", fmt.Errorf("empty string")
-	}
-	sCheck := s
-	if len(sCheck) > 2 && sCheck[:2] == "#/" { //Ally:import "#/foo" is valid style
-		sCheck = sCheck[2:]
-	}
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-	for _, r := range sCheck {
-		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
-			return s, fmt.Errorf("invalid character %#U", r)
-		}
-	}
-	return s, nil
-}
+//func ValidateImportPath(path string) (string, error) {
+//	s, err := strconv.Unquote(path)
+//	if err != nil {
+//		return "", err
+//	}
+//	if s == "" {
+//		return "", fmt.Errorf("empty string")
+//	}
+//	sCheck := s
+//	if len(sCheck) > 2 && sCheck[:2] == "#/" { //Ally:import "#/foo" is valid style
+//		sCheck = sCheck[2:]
+//	}
+//	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+//	for _, r := range sCheck {
+//		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+//			return s, fmt.Errorf("invalid character %#U", r)
+//		}
+//	}
+//	return s, nil
+//}
 
 // IsLocalRootBasedImport reports whether the import path is
 // a local root related import path, like "#/foo"
@@ -1065,6 +1065,7 @@ Found:
 	}
 
 	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot)
+
 	return p, pkgerr
 }
 
