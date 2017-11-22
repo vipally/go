@@ -1068,7 +1068,7 @@ Found:
 		}
 	}
 
-	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot)
+	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s err=%v\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot, badGoError)
 
 	return p, pkgerr
 }

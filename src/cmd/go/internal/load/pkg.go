@@ -500,7 +500,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		perr := *p
 		perr.Error = &PackageError{
 			ImportStack: stk.Copy(),
-			Err:         fmt.Sprintf("local import %q in non-local package", path),
+			Err:         fmt.Sprintf("import local package %q in non-local package", p.Dir),
 		}
 		return setErrorPos(&perr, importPos)
 	}
