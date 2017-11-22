@@ -375,7 +375,7 @@ const (
 
 //Ally: import local package by "#/xxx" style
 
-// SearchLocalRoot find the parent of path that contains sub-tree "<root>/src/vendor" up from curPath
+// SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath
 // which is the root of local project.
 // It returns "" if not found.
 // The expected working tree of LocalRoot is:
@@ -393,7 +393,7 @@ const (
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	//find any parent dir that contains "vendor" dir
 	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
-		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) && strings.HasSuffix(dir, "src") {
+		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) {
 			if root, name := filepath.Split(dir); name == "src" {
 				return filepath.Clean(root)
 			}
@@ -1084,7 +1084,7 @@ Found:
 	if p.LocalPackage {
 		localRoot := searchLocalRoot()
 		if localRoot == "" {
-			return p, fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, path, srcDir)
+			return p, fmt.Errorf(`import %q: cannot find local root(with sub-tree "<root>/src/vendor") up from %s`, path, srcDir)
 		}
 
 		//p.Dir = ctxt.joinPath(localRoot, "src", p.ImportPath)
