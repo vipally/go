@@ -419,9 +419,9 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	} else {
 		p = new(Package)
 		p.Internal.Local = isLocal
-		if !isLocalRootRelImport {
-			p.ImportPath = importPath
-		}
+		//		if !isLocalRootRelImport {
+		//			p.ImportPath = importPath
+		//		}
 
 		packageCache[importPath] = p
 
@@ -440,7 +440,12 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			}
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
-		if !isLocalRootRelImport {
+		//		if !isLocalRootRelImport {
+		//			bp.ImportPath = importPath
+		//		}
+		//test case import path=".", srcDir="<GoPath>../main"
+		//it will cause the target name "..exe"
+		if bp.ImportPath == "." {
 			bp.ImportPath = importPath
 		}
 		if cfg.GOBIN != "" {
