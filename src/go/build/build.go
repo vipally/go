@@ -160,10 +160,16 @@ func (ctxt *Context) hasSubdir(root, dir string) (rel string, ok bool) {
 func hasSubdir(root, dir string) (rel string, ok bool) {
 	const sep = string(filepath.Separator)
 	root = filepath.Clean(root)
+	dir = filepath.Clean(dir)
+
+	if root == dir { //Fix bug: GoPath/src/*.go cannot install
+		return ".", true
+	}
+
 	if !strings.HasSuffix(root, sep) {
 		root += sep
 	}
-	dir = filepath.Clean(dir)
+
 	if !strings.HasPrefix(dir, root) {
 		return "", false
 	}
@@ -1114,7 +1120,7 @@ Found:
 		}
 	}
 
-	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s err=%v\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot, badGoError)
+	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s err=%v\nConflictDir=%s\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot, badGoError, p.ConflictDir)
 
 	return p, pkgerr
 }
