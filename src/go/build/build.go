@@ -18,6 +18,7 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -375,6 +376,9 @@ const (
 
 //Ally: import local package by "#/xxx" style
 
+// match "<root>/src/..." case to find <root>
+var srcRE = regexp.MustCompile(`(^.+)(?:[\\|/]src[$|\\|/])`)
+
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath
 // which is the root of local project.
 // It returns "" if not found.
@@ -392,11 +396,18 @@ const (
 //	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	//find any parent dir that contains "vendor" dir
-	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
-		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) {
-			if root, name := filepath.Split(dir); name == "src" {
-				return filepath.Clean(root)
+	dir := curPath
+	withSrc := ""
+	for {
+		// if dir=`c:\root\src\prj\src\main`
+		// match[0]=[]string{"c:\\root\\src\\prj\\src\\", "c:\\root\\src\\prj"}
+		if match := srcRE.FindAllStringSubmatch(dir, 1); match != nil {
+			withSrc, dir = match[0][0], match[0][1]
+			if vendor := ctxt.joinPath(withSrc, "vendor"); ctxt.isDir(vendor) {
+				return filepath.Clean(dir)
 			}
+		} else {
+			break
 		}
 	}
 	return ""
