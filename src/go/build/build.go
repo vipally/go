@@ -377,7 +377,7 @@ const (
 //Ally: import local package by "#/xxx" style
 
 // match "<root>/src/..." case to find <root>
-var srcRE = regexp.MustCompile(`(^.+)(?:[\\|/]src[$|\\|/])`)
+var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
 
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath
 // which is the root of local project.
