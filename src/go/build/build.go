@@ -396,12 +396,11 @@ var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
 //	    │
 //	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
-	//find any parent dir that contains "vendor" dir
 	dir := curPath
 	withSrc := ""
 	for {
-		// if dir=`c:\root\src\prj\src\main`
-		// match[0]=[]string{"c:\\root\\src\\prj\\src\\", "c:\\root\\src\\prj"}
+		// if dir = `c:\root\src\prj\src\main`
+		// match[0 ]= []string{"c:\\root\\src\\prj\\src\\", "c:\\root\\src\\prj"}
 		if match := srcRE.FindAllStringSubmatch(dir, 1); match != nil {
 			withSrc, dir = match[0][0], match[0][1]
 			if vendor := ctxt.joinPath(withSrc, "vendor"); ctxt.isDir(vendor) {
