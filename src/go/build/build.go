@@ -702,16 +702,19 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				// We found a potential import path for dir,
 				// but check that using it wouldn't find something
 				// else first.
-				if ctxt.GOROOT != "" {
-					if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
-						p.ConflictDir = dir
-						goto Found
+				// when srcDir==GoPath/src, sub=".", it will always conflict
+				if sub != "." && sub != "" {
+					if ctxt.GOROOT != "" {
+						if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
+							p.ConflictDir = dir
+							goto Found
+						}
 					}
-				}
-				for _, earlyRoot := range all[:i] {
-					if dir := ctxt.joinPath(earlyRoot, "src", sub); ctxt.isDir(dir) {
-						p.ConflictDir = dir
-						goto Found
+					for _, earlyRoot := range all[:i] {
+						if dir := ctxt.joinPath(earlyRoot, "src", sub); ctxt.isDir(dir) {
+							p.ConflictDir = dir
+							goto Found
+						}
 					}
 				}
 
