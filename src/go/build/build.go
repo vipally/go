@@ -393,7 +393,6 @@ var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
 //	    │
 //	    ├─vendor
 //	    │      ...
-//	    │
 //	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	dir := curPath
