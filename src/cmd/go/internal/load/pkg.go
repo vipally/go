@@ -406,11 +406,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	} else {
 		p = new(Package)
 		p.Internal.Local = isLocal
-
-		// Fix #22863: main package in GoPath/src/ runs "go install" fail.
-		// see: https://github.com/golang/go/issues/22863
-		// Do not change ImportPath.
-		//p.ImportPath = importPath
+		p.ImportPath = importPath
 
 		packageCache[importPath] = p
 
@@ -430,11 +426,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
 
-		// Fix #22863: main package in GoPath/src/ runs "go install" fail.
-		// see: https://github.com/golang/go/issues/22863
-		// Do not change ImportPath.
-		//bp.ImportPath = importPath
-
+		bp.ImportPath = importPath
 		if cfg.GOBIN != "" {
 			bp.BinDir = cfg.GOBIN
 		}
