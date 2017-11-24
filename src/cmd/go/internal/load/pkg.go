@@ -406,7 +406,12 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	} else {
 		p = new(Package)
 		p.Internal.Local = isLocal
-		p.ImportPath = importPath
+
+		// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+		// see: https://github.com/golang/go/issues/22863
+		// Do not change ImportPath.
+		//p.ImportPath = importPath
+
 		packageCache[importPath] = p
 
 		// Load package.
@@ -424,7 +429,12 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			}
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
-		bp.ImportPath = importPath
+
+		// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+		// see: https://github.com/golang/go/issues/22863
+		// Do not change ImportPath.
+		//bp.ImportPath = importPath
+
 		if cfg.GOBIN != "" {
 			bp.BinDir = cfg.GOBIN
 		}
@@ -526,20 +536,25 @@ func VendoredImportPath(parent *Package, path string) (found string) {
 		root = expandPath(root)
 	}
 
-	if !hasFilePathPrefix(dir, root) || len(dir) <= len(root) || dir[len(root)] != filepath.Separator || parent.ImportPath != "command-line-arguments" && !parent.Internal.Local && filepath.Join(root, parent.ImportPath) != dir {
-		base.Fatalf("unexpected directory layout:\n"+
-			"	import path: %s\n"+
-			"	root: %s\n"+
-			"	dir: %s\n"+
-			"	expand root: %s\n"+
-			"	expand dir: %s\n"+
-			"	separator: %s",
-			parent.ImportPath,
-			filepath.Join(parent.Root, "src"),
-			filepath.Clean(parent.Dir),
-			root,
-			dir,
-			string(filepath.Separator))
+	// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+	// see: https://github.com/golang/go/issues/22863
+	// When path="GoPath/src", dir==root, it will always fail but not expected.
+	if dir != root {
+		if !hasFilePathPrefix(dir, root) || len(dir) <= len(root) || dir[len(root)] != filepath.Separator || parent.ImportPath != "command-line-arguments" && !parent.Internal.Local && filepath.Join(root, parent.ImportPath) != dir {
+			base.Fatalf("unexpected directory layout:\n"+
+				"	import path: %s\n"+
+				"	root: %s\n"+
+				"	dir: %s\n"+
+				"	expand root: %s\n"+
+				"	expand dir: %s\n"+
+				"	separator: %s",
+				parent.ImportPath,
+				filepath.Join(parent.Root, "src"),
+				filepath.Clean(parent.Dir),
+				root,
+				dir,
+				string(filepath.Separator))
+		}
 	}
 
 	vpath := "vendor/" + path

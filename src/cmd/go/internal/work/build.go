@@ -10,7 +10,6 @@ import (
 	"go/build"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -281,7 +280,13 @@ func runBuild(cmd *base.Command, args []string) {
 	pkgs := load.PackagesForBuild(args)
 
 	if len(pkgs) == 1 && pkgs[0].Name == "main" && cfg.BuildO == "" {
-		_, cfg.BuildO = path.Split(pkgs[0].ImportPath)
+		// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+		// see: https://github.com/golang/go/issues/22863
+		// When srcDir="GoPath/../foo", pkgs[0].ImportPath=".", cfg.BuildO will be "..exe" which is not expected.
+		// So replace
+		//  "_, cfg.BuildO = path.Split(pkgs[0].ImportPath)"
+		// with follow line.
+		_, cfg.BuildO = filepath.Split(pkgs[0].Dir)
 		cfg.BuildO += cfg.ExeSuffix
 	}
 

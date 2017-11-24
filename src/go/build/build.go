@@ -159,10 +159,18 @@ func (ctxt *Context) hasSubdir(root, dir string) (rel string, ok bool) {
 func hasSubdir(root, dir string) (rel string, ok bool) {
 	const sep = string(filepath.Separator)
 	root = filepath.Clean(root)
+	dir = filepath.Clean(dir)
+
+	// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+	// see: https://github.com/golang/go/issues/22863
+	if root == dir {
+		return ".", true
+	}
+
 	if !strings.HasSuffix(root, sep) {
 		root += sep
 	}
-	dir = filepath.Clean(dir)
+
 	if !strings.HasPrefix(dir, root) {
 		return "", false
 	}
@@ -555,16 +563,22 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				// We found a potential import path for dir,
 				// but check that using it wouldn't find something
 				// else first.
-				if ctxt.GOROOT != "" {
-					if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
-						p.ConflictDir = dir
-						goto Found
+
+				// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+				// see: https://github.com/golang/go/issues/22863
+				// When srcDir="GoPath/src", sub=".", it will always conflict but not expected.
+				if sub != "." && sub != "" {
+					if ctxt.GOROOT != "" {
+						if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
+							p.ConflictDir = dir
+							goto Found
+						}
 					}
-				}
-				for _, earlyRoot := range all[:i] {
-					if dir := ctxt.joinPath(earlyRoot, "src", sub); ctxt.isDir(dir) {
-						p.ConflictDir = dir
-						goto Found
+					for _, earlyRoot := range all[:i] {
+						if dir := ctxt.joinPath(earlyRoot, "src", sub); ctxt.isDir(dir) {
+							p.ConflictDir = dir
+							goto Found
+						}
 					}
 				}
 
