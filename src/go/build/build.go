@@ -162,7 +162,9 @@ func hasSubdir(root, dir string) (rel string, ok bool) {
 	root = filepath.Clean(root)
 	dir = filepath.Clean(dir)
 
-	if root == dir { //Fix bug: GoPath/src/*.go cannot install
+	// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+	// see: https://github.com/golang/go/issues/22863
+	if root == dir {
 		return ".", true
 	}
 
@@ -702,7 +704,10 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				// We found a potential import path for dir,
 				// but check that using it wouldn't find something
 				// else first.
-				// when srcDir==GoPath/src, sub=".", it will always conflict
+
+				// Fix #22863: main package in GoPath/src/ runs "go install" fail.
+				// see: https://github.com/golang/go/issues/22863
+				// When srcDir="GoPath/src", sub=".", it will always conflict but not expected.
 				if sub != "." && sub != "" {
 					if ctxt.GOROOT != "" {
 						if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
