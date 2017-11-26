@@ -1368,7 +1368,7 @@ func LoadPackage(arg string, stk *ImportStack) *Package {
 	// "./ioutil".
 	if build.IsLocalImport(arg) {
 		bp, _ := cfg.BuildContext.ImportDir(filepath.Join(base.Cwd, arg), build.FindOnly)
-		if bp.ImportPath != "" && bp.ImportPath != "." {
+		if bp.ImportPath != "" && bp.ImportPath != "." && bp.LocalRoot == "" { //Ally: if local root exists, it's not related to GoPath.
 			arg = bp.ImportPath
 		}
 	}
