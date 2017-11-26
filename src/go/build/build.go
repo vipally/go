@@ -431,8 +431,15 @@ func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
 
 // GetLocalRootRelatedImportPath conver #/x/y/z to x/y/z
 func GetLocalRootRelatedImportPath(imported string) string {
-	if len(imported) > 2 && imported[:2] == "#/" { //Ally:import "#/foo" is valid style
-		imported = imported[2:]
+	//Ally:import "#/foo" is valid style
+	if len(imported) > 0 && imported[0] == '#' {
+		imported = imported[1:]
+		if len(imported) > 0 && imported[0] == '/' {
+			imported = imported[1:]
+		}
+	}
+	if len(imported) == 0 {
+		imported = "."
 	}
 	return imported
 }
@@ -469,8 +476,28 @@ func GetLocalRootRelatedImportPath(imported string) string {
 // a local root related import path, like "#/foo"
 // "#"will be replaced with which contains sub-directory "vendor" up from current package path.
 func IsLocalRootBasedImport(path string) bool {
-	localStyle := len(path) > 2 && path[:2] == "#/"
+	localStyle := len(path) > 2 && path[:2] == "#/" || path == "#"
 	return localStyle
+}
+
+// dirToImportPath returns the pseudo-import path we use for a package
+// outside the Go path. It begins with _/ and then contains the full path
+// to the directory. If the package lives in c:\home\gopher\my\pkg then
+// the pseudo-import path is _/c_/home/gopher/my/pkg.
+// Using a pseudo-import path like this makes the ./ imports no longer
+// a special case, so that all the code to deal with ordinary imports works
+// automatically.
+func dirToImportPath(dir string) string {
+	return pathpkg.Join("_", strings.Map(makeImportValid, filepath.ToSlash(dir)))
+}
+
+func makeImportValid(r rune) rune {
+	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
+	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+		return '_'
+	}
+	return r
 }
 
 // A Package describes the Go package found in a directory.
@@ -681,12 +708,25 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 		if !ctxt.isAbsPath(path) {
 			p.Dir = ctxt.joinPath(srcDir, path)
 		}
+
 		// p.Dir directory may or may not exist. Gather partial information first, check if it exists later.
 		// Determine canonical import path, if any.
 		// Exclude results where the import path would include /testdata/.
 		inTestdata := func(sub string) bool {
 			return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
 		}
+
+		//Ally: find if this path is in a local root
+		if searchLocalRoot() != "" {
+			p.SrcRoot = ctxt.joinPath(p.LocalRoot, "src")
+			if sub, ok := ctxt.hasSubdir(p.SrcRoot, p.Dir); ok && !inTestdata(sub) {
+				p.ImportPath = sub
+				p.Root = p.LocalRoot
+				setPkga() // p.ImportPath changed
+				goto Found
+			}
+		}
+
 		if ctxt.GOROOT != "" {
 			root := ctxt.joinPath(ctxt.GOROOT, "src")
 			if sub, ok := ctxt.hasSubdir(root, p.Dir); ok && !inTestdata(sub) {
@@ -1111,11 +1151,11 @@ Found:
 			return p, fmt.Errorf(`import %q: cannot find local root(with sub-tree "<root>/src/vendor") up from %s`, path, srcDir)
 		}
 
-		//p.Dir = ctxt.joinPath(localRoot, "src", p.ImportPath)
 		p.Root = localRoot
 		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-		p.ImportPath, _ = filepath.Rel(p.SrcRoot, p.Dir)
-		p.ImportPath = filepath.ToSlash(p.ImportPath)
+		if sub, ok := ctxt.hasSubdir(p.SrcRoot, p.Dir); ok {
+			p.ImportPath = sub
+		}
 	}
 
 	if p.Root != "" {
@@ -1128,6 +1168,7 @@ Found:
 		}
 	}
 
+	//Ally debug:
 	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s err=%v\nConflictDir=%s\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot, badGoError, p.ConflictDir)
 
 	return p, pkgerr

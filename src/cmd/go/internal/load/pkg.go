@@ -419,7 +419,11 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	} else {
 		p = new(Package)
 		p.Internal.Local = isLocal
-		p.ImportPath = importPath
+		//Ally debug:
+		//fmt.Printf("LoadImport [%s] [%s] \nisLocal=%v  importPath=%s\nparent=%#v\n", path, srcDir, isLocal, importPath, parent)
+		if isLocal {
+			p.ImportPath = importPath
+		}
 
 		packageCache[importPath] = p
 
@@ -438,8 +442,9 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			}
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
-
-		bp.ImportPath = importPath
+		if isLocal {
+			bp.ImportPath = importPath
+		}
 
 		if cfg.GOBIN != "" {
 			bp.BinDir = cfg.GOBIN
@@ -554,7 +559,7 @@ func VendoredImportPath(parent *Package, path string) (found string) {
 	// Fix #22863: main package in GoPath/src/ runs "go install" fail.
 	// see: https://github.com/golang/go/issues/22863
 	// When path="GoPath/src", dir==root, it will always fail but not expected.
-	if dir != root {
+	if dir != root && !parent.Internal.LocalPackage && !parent.Internal.Local {
 		if !hasFilePathPrefix(dir, root) || len(dir) <= len(root) || dir[len(root)] != filepath.Separator || parent.ImportPath != "command-line-arguments" && !parent.Internal.Local && filepath.Join(root, parent.ImportPath) != dir {
 			base.Fatalf("unexpected directory layout:\n"+
 				"	import path: %s\n"+
@@ -569,6 +574,8 @@ func VendoredImportPath(parent *Package, path string) (found string) {
 				root,
 				dir,
 				string(filepath.Separator))
+			//fmt.Printf("VendoredImportPath path=%s\nparent=%#v\n", path, parent)
+			//panic("check fail")
 		}
 	}
 
