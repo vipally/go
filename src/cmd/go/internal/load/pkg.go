@@ -384,6 +384,16 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	stk.Push(path)
 	defer stk.Pop()
 
+	searchLocalRoot := func() string {
+		localRoot := ""
+		if parent != nil {
+			localRoot = parent.Internal.LocalRoot
+		} else {
+			localRoot = cfg.BuildContext.SearchLocalRoot(srcDir)
+		}
+		return localRoot
+	}
+
 	// Determine canonical identifier for this package.
 	// For a local import the identifier is the pseudo-import path
 	// we create from the full directory to the package.
@@ -392,13 +402,12 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	importPath := path
 	origPath := path
 	isLocal := build.IsLocalImport(path)
-	isLocalRootRelImport := build.IsLocalRootBasedImport(path)
+	localRoot := searchLocalRoot()
 	var debugDeprecatedImportcfgDir string
-	if isLocal {
-		importPath = dirToImportPath(filepath.Join(srcDir, path))
-	} else if isLocalRootRelImport {
-		localRoot := cfg.BuildContext.SearchLocalRoot(srcDir)
+	if localRoot != "" && localRoot != cfg.BuildContext.GOROOT {
 		importPath = build.GetLocalRootRelatedPath(localRoot, path)
+	} else if isLocal {
+		importPath = dirToImportPath(filepath.Join(srcDir, path))
 	} else if DebugDeprecatedImportcfg.enabled {
 		if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
 			debugDeprecatedImportcfgDir = d
@@ -1368,7 +1377,7 @@ func LoadPackage(arg string, stk *ImportStack) *Package {
 	// "./ioutil".
 	if build.IsLocalImport(arg) {
 		bp, _ := cfg.BuildContext.ImportDir(filepath.Join(base.Cwd, arg), build.FindOnly)
-		if bp.ImportPath != "" && bp.ImportPath != "." {
+		if bp.ImportPath != "" && bp.ImportPath != "." && bp.LocalRoot == "" { //Ally: if local root exists, it's not related to GoPath.
 			arg = bp.ImportPath
 		}
 	}

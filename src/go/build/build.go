@@ -480,25 +480,25 @@ func IsLocalRootBasedImport(path string) bool {
 	return localStyle
 }
 
-// dirToImportPath returns the pseudo-import path we use for a package
-// outside the Go path. It begins with _/ and then contains the full path
-// to the directory. If the package lives in c:\home\gopher\my\pkg then
-// the pseudo-import path is _/c_/home/gopher/my/pkg.
-// Using a pseudo-import path like this makes the ./ imports no longer
-// a special case, so that all the code to deal with ordinary imports works
-// automatically.
-func dirToImportPath(dir string) string {
-	return pathpkg.Join("_", strings.Map(makeImportValid, filepath.ToSlash(dir)))
-}
+//// dirToImportPath returns the pseudo-import path we use for a package
+//// outside the Go path. It begins with _/ and then contains the full path
+//// to the directory. If the package lives in c:\home\gopher\my\pkg then
+//// the pseudo-import path is _/c_/home/gopher/my/pkg.
+//// Using a pseudo-import path like this makes the ./ imports no longer
+//// a special case, so that all the code to deal with ordinary imports works
+//// automatically.
+//func dirToImportPath(dir string) string {
+//	return pathpkg.Join("_", strings.Map(makeImportValid, filepath.ToSlash(dir)))
+//}
 
-func makeImportValid(r rune) rune {
-	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
-		return '_'
-	}
-	return r
-}
+//func makeImportValid(r rune) rune {
+//	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
+//	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+//	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+//		return '_'
+//	}
+//	return r
+//}
 
 // A Package describes the Go package found in a directory.
 type Package struct {
