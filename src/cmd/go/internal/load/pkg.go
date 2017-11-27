@@ -406,6 +406,9 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	var debugDeprecatedImportcfgDir string
 	if localRoot != "" && localRoot != cfg.BuildContext.GOROOT {
 		importPath = build.GetLocalRootRelatedPath(localRoot, path)
+		if importPath == "." {
+			importPath = srcDir
+		}
 	} else if isLocal {
 		importPath = dirToImportPath(filepath.Join(srcDir, path))
 	} else if DebugDeprecatedImportcfg.enabled {
@@ -422,6 +425,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		importPath = path
 	}
 
+	//fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
 	p := packageCache[importPath]
 	if p != nil {
 		p = reusePackage(p, stk)

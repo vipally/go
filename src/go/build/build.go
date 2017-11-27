@@ -424,9 +424,10 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 // rootBasedPath must format as "#/foo"
 func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
 	if IsLocalRootBasedImport(rootBasedPath) {
-		return filepath.ToSlash(filepath.Join(localRootPath, rootBasedPath[2:]))
+		relPath := GetLocalRootRelatedImportPath(rootBasedPath)
+		return filepath.ToSlash(filepath.Join(localRootPath, relPath))
 	}
-	return ""
+	return rootBasedPath
 }
 
 // GetLocalRootRelatedImportPath conver #/x/y/z to x/y/z
@@ -620,7 +621,7 @@ func nameExt(name string) string {
 // *Package containing partial information.
 //
 func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Package, error) {
-	//fmt.Println("Import", path, srcDir, mode)
+	//fmt.Printf("Context.Import path=[%s] srcDir=[%s] mode=%d\n", path, srcDir, mode)
 	p := &Package{
 		ImportPath: GetLocalRootRelatedImportPath(path), //Ally: conver #/x/y/z to x/y/z
 	}
