@@ -403,12 +403,14 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	origPath := path
 	isLocal := build.IsLocalImport(path)
 	localRoot := searchLocalRoot()
+	isLocalRootRelated := localRoot != "" && localRoot != cfg.BuildContext.GOROOT
 	var debugDeprecatedImportcfgDir string
-	if localRoot != "" && localRoot != cfg.BuildContext.GOROOT {
+	if isLocalRootRelated {
 		importPath = build.GetLocalRootRelatedPath(localRoot, path)
 		if importPath == "." {
 			importPath = srcDir
 		}
+		importPath = dirToImportPath(importPath)
 	} else if isLocal {
 		importPath = dirToImportPath(filepath.Join(srcDir, path))
 	} else if DebugDeprecatedImportcfg.enabled {
@@ -434,7 +436,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		p.Internal.Local = isLocal
 		//Ally debug:
 		//fmt.Printf("LoadImport [%s] [%s] \nisLocal=%v  importPath=%s\nparent=%#v\n", path, srcDir, isLocal, importPath, parent)
-		if isLocal {
+		if isLocal || isLocalRootRelated {
 			p.ImportPath = importPath
 		}
 
@@ -455,7 +457,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			}
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
-		if isLocal {
+		if isLocal || isLocalRootRelated {
 			bp.ImportPath = importPath
 		}
 
@@ -572,7 +574,7 @@ func VendoredImportPath(parent *Package, path string) (found string) {
 	// Fix #22863: main package in GoPath/src/ runs "go install" fail.
 	// see: https://github.com/golang/go/issues/22863
 	// When path="GoPath/src", dir==root, it will always fail but not expected.
-	if dir != root && !parent.Internal.LocalPackage && !parent.Internal.Local {
+	if dir != root && parent.Internal.LocalRoot != "" && !parent.Internal.Local {
 		if !hasFilePathPrefix(dir, root) || len(dir) <= len(root) || dir[len(root)] != filepath.Separator || parent.ImportPath != "command-line-arguments" && !parent.Internal.Local && filepath.Join(root, parent.ImportPath) != dir {
 			base.Fatalf("unexpected directory layout:\n"+
 				"	import path: %s\n"+
