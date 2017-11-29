@@ -18,7 +18,6 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -381,125 +380,6 @@ const (
 	// Import makes no attempt to resolve or check those paths.
 	IgnoreVendor
 )
-
-//Ally: import local package by "#/xxx" style
-
-// match "<root>/src/..." case to find <root>
-var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
-
-// SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath,
-// which is the root of local project.
-// Actually, a LocalRoot is a private GoPath that is accessible to sub-packages only.
-// It returns "" if not found.
-// The expected working tree of LocalRoot is:
-//	LocalRoot
-//	│
-//	├─bin
-//	├─pkg
-//	└─src
-//	    │  ...
-//	    │
-//	    ├─vendor
-//	    │      ...
-//	    └─...
-func (ctxt *Context) SearchLocalRoot(curPath string) string {
-	dir := curPath
-	withSrc := ""
-	for {
-		// if dir = `c:\root\src\prj\src\main`
-		// match[0 ]= []string{"c:\\root\\src\\prj\\src\\", "c:\\root\\src\\prj"}
-		if match := srcRE.FindAllStringSubmatch(dir, 1); match != nil {
-			withSrc, dir = match[0][0], match[0][1]
-			if vendor := ctxt.joinPath(withSrc, "vendor"); ctxt.isDir(vendor) {
-				return filepath.Clean(dir)
-			}
-		} else {
-			break
-		}
-	}
-	return ""
-}
-
-// GetLocalRootRelPath joins localRootPath and rootBasedPath
-// rootBasedPath must format as "#/foo"
-func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
-	if IsLocalRootBasedImport(rootBasedPath) {
-		relPath := GetLocalRootRelatedImportPath(rootBasedPath)
-		return filepath.ToSlash(filepath.Join(localRootPath, relPath))
-	}
-	return rootBasedPath
-}
-
-// GetLocalRootRelatedImportPath conver #/x/y/z to x/y/z
-func GetLocalRootRelatedImportPath(imported string) string {
-	//Ally:import "#/foo" is valid style
-	if len(imported) > 0 && imported[0] == '#' {
-		imported = imported[1:]
-		if len(imported) > 0 && imported[0] == '/' {
-			imported = imported[1:]
-		}
-	}
-	if len(imported) == 0 {
-		imported = "."
-	}
-	return imported
-}
-
-// IsValidImport verify if imported is a valid import string
-// #/... style is valid.
-//func IsValidImport(imported string) bool {
-//	return parser.IsValidImport(imported)
-//}
-
-// ValidateImportPath returns Unquote of path if valid
-//func ValidateImportPath(path string) (string, error) {
-//	s, err := strconv.Unquote(path)
-//	if err != nil {
-//		return "", err
-//	}
-//	if s == "" {
-//		return "", fmt.Errorf("empty string")
-//	}
-//	sCheck := s
-//	if len(sCheck) > 2 && sCheck[:2] == "#/" { //Ally:import "#/foo" is valid style
-//		sCheck = sCheck[2:]
-//	}
-//	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-//	for _, r := range sCheck {
-//		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
-//			return s, fmt.Errorf("invalid character %#U", r)
-//		}
-//	}
-//	return s, nil
-//}
-
-// IsLocalRootBasedImport reports whether the import path is
-// a local root related import path, like "#/foo"
-// "#"will be replaced with which contains sub-directory "vendor" up from current package path.
-func IsLocalRootBasedImport(path string) bool {
-	localStyle := len(path) > 2 && path[:2] == "#/" || path == "#"
-	return localStyle
-}
-
-//// dirToImportPath returns the pseudo-import path we use for a package
-//// outside the Go path. It begins with _/ and then contains the full path
-//// to the directory. If the package lives in c:\home\gopher\my\pkg then
-//// the pseudo-import path is _/c_/home/gopher/my/pkg.
-//// Using a pseudo-import path like this makes the ./ imports no longer
-//// a special case, so that all the code to deal with ordinary imports works
-//// automatically.
-//func dirToImportPath(dir string) string {
-//	return pathpkg.Join("_", strings.Map(makeImportValid, filepath.ToSlash(dir)))
-//}
-
-//func makeImportValid(r rune) rune {
-//	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
-//	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-//	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
-//		return '_'
-//	}
-//	return r
-//}
 
 // A Package describes the Go package found in a directory.
 type Package struct {
