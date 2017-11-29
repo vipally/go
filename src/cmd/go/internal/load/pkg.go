@@ -1390,6 +1390,7 @@ func LoadPackage(arg string, stk *ImportStack) *Package {
 		}
 	}
 
+	//Ally: load package from dir
 	return LoadImport(arg, base.Cwd, nil, stk, nil, 0)
 }
 

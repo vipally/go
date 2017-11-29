@@ -4,12 +4,27 @@
 
 package build
 
+//Ally:  refer local package by [import "#/x/y/z"] style
+
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 )
 
-//Ally: import local package by "#/xxx" style
+var (
+	wd        = getwd()
+	goRootSrc = filepath.Join(Default.GOROOT, "src")
+)
+
+func getwd() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		panic("cannot determine current directory: " + err.Error())
+	}
+	return wd
+}
 
 // match "<root>/src/..." case to find <root>
 var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
@@ -211,16 +226,22 @@ func IsLocalRootBasedImport(path string) bool {
 //}
 
 // PackageType represents type of a imported package
-type PackageType uint
+type PackageType uint8
 
 const (
-	PackageStandAlone PackageType = iota //import "./../xx" style, invalid
+	PackageUnknown    PackageType = iota //unknown, invalid
+	PackageStandAlone                    //import "./../xx" style, invalid
 	PackageLocalRoot                     //import "#/x/y/z" style
-	PackageGlobal                        //import "x/y/z" style, not find yet
 	PackageVendor                        //import "x/y/z" style, find from vendor tree
 	PackageGoRoot                        //import "x/y/z" style, find from GoRoot
 	PackageGoPath                        //import "x/y/z" style, find from GoPath
 )
+
+func (t PackageType) IsStandAlonePackage() bool { return t == PackageStandAlone }
+func (t PackageType) IsLocalPackage() bool      { return t == PackageLocalRoot }
+func (t PackageType) IsStdPackage() bool        { return t == PackageGoRoot }
+func (t PackageType) IsGlobalPackage() bool     { return t == PackageGoPath }
+func (t PackageType) IsVendoredPackage() bool   { return t == PackageVendor }
 
 func (t PackageType) String() string {
 	switch t {
@@ -230,8 +251,6 @@ func (t PackageType) String() string {
 		return "Vendor"
 	case PackageLocalRoot:
 		return "LocalRoot"
-	case PackageGlobal:
-		return "Global"
 	case PackageGoRoot:
 		return "GoRoot"
 	case PackageGoPath:
@@ -240,18 +259,72 @@ func (t PackageType) String() string {
 	return "unknown"
 }
 
-type PackageInfo struct {
-	ImportPath string //original import path: "x/y/z" "#/x/y/z"
-	ImportDir  string //Dir that import this package
-	Dir        string //Dir of imported package
-	Root       string //Root of imported package
-	Signature  string //Signature of imported package, to
-	Type       PackageType
+func (t PackageType) Signature() string {
+	return ""
 }
 
-// Search package information by path and srcDir
-// import "fmt"
-func (info *PackageInfo) GetSignature(path, srcDir string) error {
+// PackagePath represent path information of a package
+type PackagePath struct {
+	ImportPath  string      //regular original import path like: "x/y/z" "#/x/y/z" "." "../foo" "#"
+	Dir         string      //Dir of imported package
+	Root        string      //Root of imported package
+	LocalRoot   string      //LocalRoot of imported package
+	Signature   string      //Signature of imported package, which is unique for every package Dir
+	ConflictDir string      // this directory shadows Dir in $GOPATH
+	Type        PackageType //Type of this package
+}
+
+func (p *PackagePath) Init() {
+	p.ImportPath = ""
+	p.Dir = ""
+	p.Root = ""
+	p.Signature = ""
+	p.Type = 0
+}
+
+func (p *PackagePath) ParseImportFromWd(imported string) error {
+	return p.ParseImport(imported, wd)
+}
+
+func (p *PackagePath) ParseImport(imported, srcDir string) error {
+	p.ImportPath = imported
+	if imported == "" {
+		return fmt.Errorf("import %q: invalid import path", imported)
+	}
+	if imported[0] == '/' {
+		return fmt.Errorf("import %q: cannot import absolute path", imported)
+	}
+
+	switch {
+	case IsLocalRootBasedImport(imported): //import "#/x/y/z" style
+		localRoot := Default.SearchLocalRoot(srcDir)
+		if localRoot == "" {
+			return fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, imported, srcDir)
+		}
+		p.LocalRoot = localRoot
+		p.Root = localRoot
+		p.ImportPath = imported
+		p.Dir = Default.joinPath(localRoot, GetLocalRootRelatedImportPath(imported))
+	case IsLocalImport(imported): //import "./../foo" style
+		full := filepath.Join(srcDir, imported)
+		p.Dir = full
+		if sub, ok := Default.hasSubdir(goRootSrc, full); ok {
+			p.Type = PackageGoRoot
+			p.ImportPath = sub
+			p.Root = Default.GOROOT
+		}
+	default: //import "x/y/z" style
+	}
+	if p.LocalRoot == "" {
+		p.LocalRoot = Default.SearchLocalRoot(p.Dir)
+	}
+
+	return nil
+}
+
+// GetSignature returns signature of a package
+// which is unique for every dir
+func (p *PackagePath) GetSignature(path, srcDir string) (string, error) {
 	//	searchLocalRoot := func() string {
 	//		localRoot := ""
 	//		if parent != nil {
@@ -289,9 +362,9 @@ func (info *PackageInfo) GetSignature(path, srcDir string) error {
 	//		path = VendoredImportPath(parent, path)
 	//		importPath = path
 	//	}
-	return nil
+	return "", nil
 }
 
-func (info *PackageInfo) Find(path, srcDir string) error {
+func (info *PackagePath) Find(path, srcDir string) error {
 	return nil
 }

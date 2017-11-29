@@ -81,7 +81,7 @@ func TestEmptyImport(t *testing.T) {
 	if p == nil {
 		t.Fatal(`Import("") returned nil package.`)
 	}
-	if p.ImportPath != "" {
+	if p.ImportPath != "." {
 		t.Fatalf("ImportPath=%q, want %q.", p.ImportPath, "")
 	}
 }
