@@ -410,7 +410,9 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		if importPath == "." {
 			importPath = srcDir
 		}
-		importPath = dirToImportPath(importPath)
+		if strings.HasPrefix(importPath, localRoot) {
+			importPath = dirToImportPath(importPath)
+		}
 	} else if isLocal {
 		importPath = dirToImportPath(filepath.Join(srcDir, path))
 	} else if DebugDeprecatedImportcfg.enabled {
