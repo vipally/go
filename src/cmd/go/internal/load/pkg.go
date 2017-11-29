@@ -429,7 +429,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		importPath = path
 	}
 
-	fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
+	//fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
 	p := packageCache[importPath]
 	if p != nil {
 		p = reusePackage(p, stk)
