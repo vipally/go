@@ -62,6 +62,10 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	return ""
 }
 
+func (ctxt *Context) SearchFromLocalRoot(imported, curPath string) (fullPath string) {
+	return ""
+}
+
 func (ctxt *Context) SearchFromVendorPath(imported, curPath string) (fullPath string) {
 	//find any parent dir that contains "vendor" dir
 	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
@@ -72,14 +76,14 @@ func (ctxt *Context) SearchFromVendorPath(imported, curPath string) (fullPath st
 	return ""
 }
 
-func (ctxt *Context) SearchFromGoRoot(imported, curPath string) string {
+func (ctxt *Context) SearchFromGoRoot(imported string) string {
 	if dir := filepath.Join(goRootSrc, imported); ctxt.isDir(dir) /*&& hasGoFiles(ctxt, dir)*/ {
 		return dir
 	}
 	return ""
 }
 
-func (ctxt *Context) SearchFromGoPath(imported, curPath string) string {
+func (ctxt *Context) SearchFromGoPath(imported string) string {
 	gopath := ctxt.gopath()
 	for _, root := range gopath {
 		if dir := ctxt.joinPath(root, "src", imported); ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
@@ -252,6 +256,57 @@ func IsLocalRootBasedImport(path string) bool {
 //	return path
 //}
 
+// ImportStyle represents style of a package imort
+type ImportStyle uint8
+
+const (
+	ImportStyleUnknown   ImportStyle = iota
+	ImportStyleSelf                  //import "."
+	ImportStyleRelated               //import "./x/y/z" "../x/y/z"
+	ImportStyleLocalRoot             //import "#/x/y/z" "#"
+	ImportStyleGlobal                //import "x/y/z"
+)
+
+func (st ImportStyle) String() string {
+	switch st {
+	case ImportStyleSelf:
+		return "StyleSelf"
+	case ImportStyleRelated:
+		return "StyleRelated"
+	case ImportStyleLocalRoot:
+		return "StyleLocalRoot"
+	case ImportStyleGlobal:
+		return "StyleGlobal"
+	}
+	return "StyleUnknown"
+}
+
+func (st ImportStyle) IsValid() bool     { return st >= ImportStyleSelf && st <= ImportStyleGlobal }
+func (st ImportStyle) IsSelf() bool      { return st == ImportStyleSelf }
+func (st ImportStyle) IsRelated() bool   { return st == ImportStyleRelated }
+func (st ImportStyle) IsLocalRoot() bool { return st == ImportStyleLocalRoot }
+func (st ImportStyle) IsGlobal() bool    { return st == ImportStyleGlobal }
+
+func GetImportStyle(imported string) ImportStyle {
+	if imported != "" {
+		switch lead := imported[0]; {
+		case lead == '.':
+			if len(imported) == 1 {
+				return ImportStyleSelf
+			} else {
+				return ImportStyleRelated
+			}
+		case lead == '#':
+			return ImportStyleLocalRoot
+		case lead == '/' || lead == '\\':
+			return ImportStyleUnknown
+		default:
+			return ImportStyleGlobal
+		}
+	}
+	return ImportStyleUnknown
+}
+
 // PackageType represents type of a imported package
 type PackageType uint8
 
@@ -264,6 +319,7 @@ const (
 	PackageGoPath                        //import "x/y/z" style, find from GoPath
 )
 
+func (t PackageType) IsValid() bool             { return t >= PackageStandAlone && t <= PackageGoPath }
 func (t PackageType) IsStandAlonePackage() bool { return t == PackageStandAlone }
 func (t PackageType) IsLocalPackage() bool      { return t == PackageLocalRoot }
 func (t PackageType) IsStdPackage() bool        { return t == PackageGoRoot }
@@ -283,7 +339,7 @@ func (t PackageType) String() string {
 	case PackageGoPath:
 		return "GoPath"
 	}
-	return "unknown"
+	return "Unknown"
 }
 
 func (t PackageType) Signature() string {
@@ -292,13 +348,13 @@ func (t PackageType) Signature() string {
 
 // PackagePath represent path information of a package
 type PackagePath struct {
-	ImportPath  string      //regular original import path like: "x/y/z" "#/x/y/z" "." "../foo" "#"
-	Dir         string      //Dir of imported package
-	Root        string      //Root of imported package
-	LocalRoot   string      //LocalRoot of imported package
-	Signature   string      //Signature of imported package, which is unique for every package Dir
+	ImportPath  string      // Regular original import path like: "x/y/z" "#/x/y/z" "." "../foo" "#"
+	Dir         string      // Dir of imported package
+	Root        string      // Root of imported package
+	LocalRoot   string      // LocalRoot of imported package
+	Signature   string      // Signature of imported package, which is unique for every package Dir
 	ConflictDir string      // this directory shadows Dir in $GOPATH
-	Type        PackageType //Type of this package
+	Type        PackageType // Type of this package
 }
 
 func (p *PackagePath) Init() {
