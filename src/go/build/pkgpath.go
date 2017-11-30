@@ -62,6 +62,33 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	return ""
 }
 
+func (ctxt *Context) SearchFromVendorPath(imported, curPath string) (fullPath string) {
+	//find any parent dir that contains "vendor" dir
+	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
+		if vendored := ctxt.joinPath(dir, "vendor", imported); ctxt.isDir(vendored) && hasGoFiles(ctxt, vendored) {
+			return vendored
+		}
+	}
+	return ""
+}
+
+func (ctxt *Context) SearchFromGoRoot(imported, curPath string) string {
+	if dir := filepath.Join(goRootSrc, imported); ctxt.isDir(dir) /*&& hasGoFiles(ctxt, dir)*/ {
+		return dir
+	}
+	return ""
+}
+
+func (ctxt *Context) SearchFromGoPath(imported, curPath string) string {
+	gopath := ctxt.gopath()
+	for _, root := range gopath {
+		if dir := ctxt.joinPath(root, "src", imported); ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
+			return dir
+		}
+	}
+	return ""
+}
+
 // GetLocalRootRelPath joins localRootPath and rootBasedPath
 // rootBasedPath must format as "#/foo"
 func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
@@ -299,8 +326,9 @@ func (p *PackagePath) ParseImport(imported, srcDir string) error {
 	case IsLocalRootBasedImport(imported): //import "#/x/y/z" style
 		localRoot := Default.SearchLocalRoot(srcDir)
 		if localRoot == "" {
-			return fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, imported, srcDir)
+			return fmt.Errorf(`import %q: cannot find local-root(with sub-tree "<root>/src/vendor") up from %s`, imported, srcDir)
 		}
+		p.Type = PackageLocalRoot
 		p.LocalRoot = localRoot
 		p.Root = localRoot
 		p.ImportPath = imported
