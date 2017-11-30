@@ -114,9 +114,9 @@ func (ctxt *Context) SearchFromGoRoot(imported string) string {
 }
 
 func (ctxt *Context) SearchFromGoPath(imported string) string {
-	gopath := ctxt.gopath()
-	for _, root := range gopath {
-		if dir := ctxt.joinPath(root, "src", imported); ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
+	gopaths := ctxt.gopath()
+	for _, gopath := range gopaths {
+		if dir := ctxt.joinPath(gopath, "src", imported); ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
 			return dir
 		}
 	}
@@ -419,7 +419,7 @@ func (p *PackagePath) ParseImport(ctxt *Context, imported, srcDir string) error 
 		p.Root = localRoot
 		p.ImportPath = imported
 		p.Dir = ctxt.joinPath(localRoot, GetLocalRootRelatedImportPath(imported))
-	case IsLocalImport(imported): //import "./../foo" style
+	case IsLocalImport(imported): //import "./foo" "../foo" style
 		full := filepath.Join(srcDir, imported)
 		p.Dir = full
 		if sub, ok := ctxt.hasSubdir(goRootSrc, full); ok {
