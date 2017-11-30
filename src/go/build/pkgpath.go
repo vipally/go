@@ -62,6 +62,10 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	return ""
 }
 
+func (ctxt *Context) SearchFromLocalRoot(imported, curPath string) (fullPath string) {
+	return ""
+}
+
 func (ctxt *Context) SearchFromVendorPath(imported, curPath string) (fullPath string) {
 	//find any parent dir that contains "vendor" dir
 	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
@@ -72,14 +76,14 @@ func (ctxt *Context) SearchFromVendorPath(imported, curPath string) (fullPath st
 	return ""
 }
 
-func (ctxt *Context) SearchFromGoRoot(imported, curPath string) string {
+func (ctxt *Context) SearchFromGoRoot(imported string) string {
 	if dir := filepath.Join(goRootSrc, imported); ctxt.isDir(dir) /*&& hasGoFiles(ctxt, dir)*/ {
 		return dir
 	}
 	return ""
 }
 
-func (ctxt *Context) SearchFromGoPath(imported, curPath string) string {
+func (ctxt *Context) SearchFromGoPath(imported string) string {
 	gopath := ctxt.gopath()
 	for _, root := range gopath {
 		if dir := ctxt.joinPath(root, "src", imported); ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
