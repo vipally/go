@@ -2222,9 +2222,11 @@ type parseSpecFunction func(doc *ast.CommentGroup, keyword token.Token, iota int
 func IsValidImport(lit string) bool {
 	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
 
-	s, _ := strconv.Unquote(lit)     // go/scanner returns a legal string literal
-	if len(s) > 2 && s[:2] == "#/" { //Ally:import "#/foo" is valid style
-		s = s[2:]
+	s, _ := strconv.Unquote(lit)   // go/scanner returns a legal string literal
+	if len(s) > 0 && s[0] == '#' { //Ally:import "#/foo" "#" is valid style
+		if s = s[1:]; len(s) == 0 {
+			s = "."
+		}
 	}
 	for _, r := range s {
 		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {

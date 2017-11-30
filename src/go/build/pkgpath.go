@@ -8,6 +8,7 @@ package build
 
 import (
 	"fmt"
+	"go/parser"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -317,24 +318,28 @@ func (st ImportStyle) IsRelated() bool   { return st == ImportStyleRelated }
 func (st ImportStyle) IsLocalRoot() bool { return st == ImportStyleLocalRoot }
 func (st ImportStyle) IsGlobal() bool    { return st == ImportStyleGlobal }
 
-func GetImportStyle(imported string) ImportStyle {
-	if imported != "" {
-		switch lead := imported[0]; {
-		case lead == '.':
-			if len(imported) == 1 {
-				return ImportStyleSelf
-			} else {
-				return ImportStyleRelated
-			}
-		case lead == '#':
-			return ImportStyleLocalRoot
-		case lead == '/' || lead == '\\':
-			return ImportStyleUnknown
-		default:
-			return ImportStyleGlobal
-		}
+func GetImportStyle(imported string) (ImportStyle, error) {
+	if !parser.IsValidImport(imported) {
+		return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
 	}
-	return ImportStyleUnknown
+	if imported[0] == '/' {
+		return ImportStyleUnknown, fmt.Errorf("import %q: cannot import absolute path", imported)
+	}
+
+	switch lead := imported[0]; {
+	case lead == '.':
+		if len(imported) == 1 {
+			return ImportStyleSelf, nil
+		} else {
+			return ImportStyleRelated, nil
+		}
+	case lead == '#':
+		return ImportStyleLocalRoot, nil
+	default:
+		return ImportStyleGlobal, nil
+	}
+
+	return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
 }
 
 // PackageType represents type of a imported package
@@ -378,13 +383,16 @@ func (t PackageType) Signature() string {
 
 // PackagePath represent path information of a package
 type PackagePath struct {
-	ImportPath  string      // Regular original import path like: "x/y/z" "#/x/y/z" "." "../foo" "#"
+	ImportPath  string      // Regular original import path like: "x/y/z" "#/x/y/z" "./foo" "../foo" "#" "."
 	Dir         string      // Dir of imported package
-	Root        string      // Root of imported package
-	LocalRoot   string      // LocalRoot of imported package
 	Signature   string      // Signature of imported package, which is unique for every package Dir
+	LocalRoot   string      // LocalRoot of imported package
+	Root        string      // Root of imported package
+	SrcRoot     string      // package source root directory ("" if unknown)
+	PkgRoot     string      // package install root directory ("" if unknown)
+	BinDir      string      // command install directory ("" if unknown)
 	ConflictDir string      // this directory shadows Dir in $GOPATH
-	Type        PackageType // Type of this package
+	Type        PackageType // PackageType of this package
 }
 
 func (p *PackagePath) Init() {
