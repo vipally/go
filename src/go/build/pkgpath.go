@@ -66,6 +66,7 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 type PackageImport struct {
 	ImporterDir string
 	ImportPath  string
+	Dir         string
 	Root        string
 	Type        PackageType
 }
@@ -75,13 +76,15 @@ func (ctxt *Context) FormatImportPath(path, srcDir string) (formated PackageImpo
 	formated.ImporterDir = srcDir
 	if path == "" || path[0] == '.' {
 		if dir := ctxt.joinPath(srcDir, path); ctxt.isDir(dir) {
+			formated.Dir = dir
+			ok = true
+
 			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
 				localRootSrc := ctxt.joinPath(localRoot, "src")
 				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
 					formated.ImportPath = "#/" + sub
 					formated.Root = localRoot
 					formated.Type = PackageLocalRoot
-					ok = true
 					return
 				}
 			}
@@ -90,7 +93,6 @@ func (ctxt *Context) FormatImportPath(path, srcDir string) (formated PackageImpo
 				formated.ImportPath = sub
 				formated.Root = ctxt.GOROOT
 				formated.Type = PackageGoRoot
-				ok = true
 				return
 			}
 
@@ -101,7 +103,6 @@ func (ctxt *Context) FormatImportPath(path, srcDir string) (formated PackageImpo
 					formated.ImportPath = sub
 					formated.Root = gopath
 					formated.Type = PackageGoPath
-					ok = true
 					return
 				}
 			}
