@@ -63,31 +63,60 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	return ""
 }
 
+type PackageImport struct {
+	ImporterDir string
+	ImportPath  string
+	Root        string
+	Type        PackageType
+}
+
 // FormatImportPath convert "." "./x/y/z" "../x/y/z" style import path to "#/x/y/z" "x/y/z" style if possible.
-func (ctxt *Context) FormatImportPath(path, srcDir string) (formated, root string, ok bool) {
+func (ctxt *Context) FormatImportPath(path, srcDir string) (formated PackageImport, ok bool) {
+	formated.ImporterDir = srcDir
 	if path == "" || path[0] == '.' {
 		if dir := ctxt.joinPath(srcDir, path); ctxt.isDir(dir) {
 			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
 				localRootSrc := ctxt.joinPath(localRoot, "src")
-				if sub, ok := ctxt.hasSubdir(localRootSrc, dir); ok {
-					return "#/" + sub, localRoot, true
+				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
+					formated.ImportPath = "#/" + sub
+					formated.Root = localRoot
+					formated.Type = PackageLocalRoot
+					ok = true
+					return
 				}
 			}
 
-			if sub, ok := ctxt.hasSubdir(goRootSrc, dir); ok { //from GoRoot
-				return sub, ctxt.GOROOT, true
+			if sub, ok_ := ctxt.hasSubdir(goRootSrc, dir); ok_ { //from GoRoot
+				formated.ImportPath = sub
+				formated.Root = ctxt.GOROOT
+				formated.Type = PackageGoRoot
+				ok = true
+				return
 			}
 
 			gopaths := ctxt.gopath()
 			for _, gopath := range gopaths { //from GoPath
 				gopathsrc := ctxt.joinPath(gopath, "src")
-				if sub, ok := ctxt.hasSubdir(gopathsrc, dir); ok {
-					return sub, gopath, true
+				if sub, ok_ := ctxt.hasSubdir(gopathsrc, dir); ok_ {
+					formated.ImportPath = sub
+					formated.Root = gopath
+					formated.Type = PackageGoPath
+					ok = true
+					return
 				}
 			}
+
+			//StandAlone package out of LocalPath/GoRoot/GoPath
+			formated.ImportPath = path
+			formated.Type = PackageStandAlone
+			ok = true
 		}
 	}
-	return path, srcDir, false
+
+	formated.ImportPath = path
+	formated.Type = PackageUnknown
+	ok = false
+	return
 }
 
 func (ctxt *Context) SearchFromLocalRoot(imported, curPath string) (fullPath string) {
@@ -287,7 +316,7 @@ func IsLocalRootBasedImport(path string) bool {
 //	return path
 //}
 
-// ImportStyle represents style of a package imort
+// ImportStyle represents style of a package import statement
 type ImportStyle uint8
 
 const (
@@ -347,8 +376,9 @@ type PackageType uint8
 
 const (
 	PackageUnknown    PackageType = iota //unknown, invalid
-	PackageStandAlone                    //import "./../xx" style, out of GoPath/GoRoot/LocalRoot
+	PackageStandAlone                    //import "./../xx" style, which is out of LocalPath/GoRoot/GoPath
 	PackageLocalRoot                     //import "#/x/y/z" style
+	PackageGlobal                        //import "x/y/z" style, not find yet
 	PackageVendor                        //import "x/y/z" style, find from vendor tree
 	PackageGoRoot                        //import "x/y/z" style, find from GoRoot
 	PackageGoPath                        //import "x/y/z" style, find from GoPath
