@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"go/parser"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,9 +18,9 @@ import (
 )
 
 var (
-	wd        = getwd()
-	goRootSrc = filepath.Join(Default.GOROOT, "src")
-	gblSrcs   = Default.SrcDirs()
+	wd        = getwd()                              // current working dir
+	goRootSrc = filepath.Join(Default.GOROOT, "src") // GoRoot/src
+	gblSrcs   = Default.SrcDirs()                    // GoRoot/src & GoPaths/src
 )
 
 // match "<root>/src/..." case to find <root>
@@ -58,67 +59,63 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	return ""
 }
 
+// FormatImportPath convert "." "./x/y/z" "../x/y/z" style import path to "#/x/y/z" "x/y/z" style if possible.
+func (ctxt *Context) FormatImportPath(imported, importerDir string) (formated FormatImport, err error) {
+	err = formated.FormatImportPath(ctxt, imported, importerDir)
+	return
+}
+
+// FormatImport is formated import infomation, which prefers "#/foo" "x/y/z" to "./x/y/z" if possible.
 type FormatImport struct {
-	ImportPath string
-	Dir        string
-	Root       string
-	Type       PackageType
-	Style      ImportStyle
-	Formated   bool
+	ImportPath  string      // formated import path,prefer "#/foo" "x/y/z" to "./x/y/z" if possible
+	Dir         string      // full directory of imported package
+	Root        string      // Root of imported package
+	Type        PackageType // Type of imported package
+	Style       ImportStyle // Style of ImportPath
+	ConflictDir string      // this directory shadows Dir in $GOPATH
+	Formated    bool        // ImportPath has changed from origin, maybe from "./../foo" to "#/foo" "x/y/z/foo".
 }
 
 // FormatImportPath convert "." "./x/y/z" "../x/y/z" style import path to "#/x/y/z" "x/y/z" style if possible.
-func (ctxt *Context) FormatImportPath(imported, importerDir string) (formated FormatImport, err error) {
-	formated.ImportPath = imported
-	formated.Type = PackageUnknown
+func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir string) (err error) {
+	fi.ImportPath = imported
+	fi.Type = PackageUnknown
 
-	if formated.Style, err = GetImportStyle(imported); err != nil {
+	if fi.Style, err = GetImportStyle(imported); err != nil {
 		return
 	}
 
-	if style := formated.Style; style.IsRelated() { //import "./xxx"
+	if style := fi.Style; style.IsRelated() { //import "./../xxx"
 		if importerDir == "" {
 			err = fmt.Errorf("import %q: import relative to unknown directory", imported)
 			return
 		}
 		if dir := ctxt.joinPath(importerDir, imported); ctxt.isDir(dir) {
-			formated.Dir = dir
-			formated.Formated = true
+			fi.Dir = dir
+			fi.Formated = true
 
 			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
 				localRootSrc := ctxt.joinPath(localRoot, "src")
 				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
-					formated.ImportPath = "#/" + sub
-					formated.Root = localRoot
-					formated.Type = PackageLocalRoot
-					formated.Style = ImportStyleLocalRoot
+					if sub != "" && sub != "." {
+						fi.ImportPath = "#/" + sub
+					} else {
+						fi.ImportPath = "#"
+					}
+					fi.Root = localRoot
+					fi.Type = PackageLocalRoot
+					fi.Style = ImportStyleLocalRoot
 					return
 				}
 			}
 
-			if sub, ok_ := ctxt.hasSubdir(goRootSrc, dir); ok_ { //from GoRoot
-				formated.ImportPath = sub
-				formated.Root = ctxt.GOROOT
-				formated.Type = PackageGoRoot
-				formated.Style = ImportStyleGlobal
+			if ok := fi.findGlobalRoot(ctxt, fi.Dir); ok {
 				return
 			}
 
-			gopaths := ctxt.gopath()
-			for _, gopath := range gopaths { //from GoPath
-				gopathsrc := ctxt.joinPath(gopath, "src")
-				if sub, ok_ := ctxt.hasSubdir(gopathsrc, dir); ok_ {
-					formated.ImportPath = sub
-					formated.Root = gopath
-					formated.Type = PackageGoPath
-					formated.Style = ImportStyleGlobal
-					return
-				}
-			}
-
 			//StandAlone package out of LocalPath/GoRoot/GoPath
-			formated.ImportPath = imported
-			formated.Type = PackageStandAlone
+			fi.ImportPath = imported
+			fi.Type = PackageStandAlone
 		} else {
 			err = fmt.Errorf("import %q: cannot find package at %s", imported, dir)
 			return
@@ -127,37 +124,36 @@ func (ctxt *Context) FormatImportPath(imported, importerDir string) (formated Fo
 	return
 }
 
-func (ctxt *Context) searchFromLocalRoot(imported, curPath string) (fullPath string) {
-	return ""
-}
+// findGlobalRoot root form GoRoot/GoPath for fullDir
+func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
+	findRootSrc := ""
+	for _, rootsrc := range gblSrcs {
+		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok {
+			fi.ImportPath = sub
+			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
+			fi.Style = ImportStyleGlobal
+			if rootsrc == goRootSrc {
+				fi.Type = PackageGoRoot
+			} else {
+				fi.Type = PackageGoPath
+			}
+			findRootSrc = rootsrc
+			break
+		}
+	}
 
-func (ctxt *Context) searchFromVendorPath(imported, curPath string) (fullPath string) {
-	//find any parent dir that contains "vendor" dir
-	for dir, lastDir := filepath.Clean(curPath), ""; dir != lastDir; dir, lastDir = filepath.Dir(dir), dir {
-		if vendor := ctxt.joinPath(dir, "vendor"); ctxt.isDir(vendor) {
-			if vendored := ctxt.joinPath(vendor, imported); ctxt.isDir(vendored) && hasGoFiles(ctxt, vendored) {
-				return vendored
+	found := findRootSrc != ""
+	if found { //check if conflict
+		for _, rootsrc := range gblSrcs {
+			if rootsrc != findRootSrc {
+				if dir := ctxt.joinPath(rootsrc, fi.ImportPath); ctxt.isDir(dir) {
+					fi.ConflictDir = dir
+					break
+				}
 			}
 		}
 	}
-	return ""
-}
-
-func (ctxt *Context) searchFromGoRoot(imported string) string {
-	if dir := filepath.Join(goRootSrc, imported); ctxt.isDir(dir) /*&& hasGoFiles(ctxt, dir)*/ {
-		return dir
-	}
-	return ""
-}
-
-func (ctxt *Context) searchFromGoPath(imported string) string {
-	gopaths := ctxt.gopath()
-	for _, gopath := range gopaths {
-		if dir := ctxt.joinPath(gopath, "src", imported); ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
-			return dir
-		}
-	}
-	return ""
+	return found
 }
 
 // GetLocalRootRelPath joins localRootPath and rootBasedPath
@@ -296,12 +292,11 @@ type PackageType uint8
 
 const (
 	PackageUnknown    PackageType = iota //unknown, invalid
-	PackageStandAlone                    //import "./../xx" style, which is out of LocalPath/GoRoot/GoPath
 	PackageLocalRoot                     //import "#/x/y/z" style
 	PackageGlobal                        //import "x/y/z" style, not find yet
-	PackageVendor                        //import "x/y/z" style, find from vendor tree
 	PackageGoRoot                        //import "x/y/z" style, find from GoRoot
 	PackageGoPath                        //import "x/y/z" style, find from GoPath
+	PackageStandAlone                    //import "./../xx" style, which is out of LocalRoot/GoRoot/GoPath
 )
 
 func (t PackageType) IsValid() bool             { return t >= PackageStandAlone && t <= PackageGoPath }
@@ -309,14 +304,11 @@ func (t PackageType) IsStandAlonePackage() bool { return t == PackageStandAlone 
 func (t PackageType) IsLocalPackage() bool      { return t == PackageLocalRoot }
 func (t PackageType) IsStdPackage() bool        { return t == PackageGoRoot }
 func (t PackageType) IsGlobalPackage() bool     { return t == PackageGoPath }
-func (t PackageType) IsVendoredPackage() bool   { return t == PackageVendor }
 
 func (t PackageType) String() string {
 	switch t {
 	case PackageStandAlone:
 		return "StandAlone"
-	case PackageVendor:
-		return "Vendor"
 	case PackageLocalRoot:
 		return "LocalRoot"
 	case PackageGoRoot:
@@ -338,7 +330,9 @@ type PackagePath struct {
 	PkgRoot     string      // package install root directory ("" if unknown)
 	BinDir      string      // command install directory ("" if unknown)
 	ConflictDir string      // this directory shadows Dir in $GOPATH
+	IsVendor    bool        // From vendor path
 	Type        PackageType // PackageType of this package
+	Style       ImportStyle // Style of ImportPath
 }
 
 func (p *PackagePath) Init() {
@@ -349,51 +343,48 @@ func (p *PackagePath) Init() {
 	p.Type = 0
 }
 
-func (p *PackagePath) FindImportFromWd(ctxt *Context, imported string) error {
-	return p.FindImport(ctxt, imported, wd)
+func (p *PackagePath) FindImportFromWd(ctxt *Context, imported string, mode ImportMode) error {
+	return p.FindImport(ctxt, imported, wd, mode)
 }
 
-func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string) error {
-	formated, err := ctxt.FormatImportPath(imported, srcDir)
-	if err != nil {
+func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode ImportMode) error {
+	var fmted FormatImport
+	if err := fmted.FormatImportPath(ctxt, imported, srcDir); err != nil {
 		return err
 	}
 
-	p.Type = formated.Type
-	p.Root = formated.Root
-	p.ImportPath = formated.ImportPath
-	p.Dir = formated.Dir
+	p.Type = fmted.Type
+	p.Root = fmted.Root
+	p.ImportPath = fmted.ImportPath
+	p.Dir = fmted.Dir
+	p.Style = fmted.Style
 
-	if !formated.Formated { //not import "./../foo" style
-		switch style := formated.Style; {
+	if !fmted.Formated { //not import "./../foo" style
+		switch style := fmted.Style; {
 		case style.IsLocalRoot(): //import "#/x/y/z" style
 			localRoot := ctxt.SearchLocalRoot(srcDir)
 			if localRoot == "" {
-				return fmt.Errorf(`import %q: cannot find local-root(with sub-tree "<root>/src/vendor") up from %s`, imported, srcDir)
+				return fmt.Errorf(`import %q: cannot find local-root(with sub-tree "<root>/src/vendor/") up from %s`, imported, srcDir)
 			}
 			p.Type = PackageLocalRoot
 			p.LocalRoot = localRoot
-			p.Root = localRoot
 			p.ImportPath = imported
-			relPath := style.RealImportPath(imported)
 
-			p.Dir = ctxt.joinPath(localRoot, "src", "vendor", relPath)
-			if !ctxt.isDir(p.Dir) {
-				p.Dir = ctxt.joinPath(localRoot, "src", relPath)
-				if !ctxt.isDir(p.Dir) {
-					return fmt.Errorf("import %q: cannot find package from local-root %s", imported, p.LocalRoot)
+			relPath := style.RealImportPath(imported)
+			dir := ""
+			if dir = ctxt.joinPath(localRoot, "src", "vendor", relPath); !ctxt.isDir(p.Dir) {
+				if dir = ctxt.joinPath(localRoot, "src", relPath); !ctxt.isDir(p.Dir) {
+					return fmt.Errorf("import %q: cannot find sub-package under local-root %s", imported, p.LocalRoot)
 				}
 			}
+			p.Dir = dir
+			p.Root = localRoot
 
 		case style.IsGlobal(): //import "x/y/z" style
-			if err := p.searchGlobalPackage(p.ImportPath); err != nil {
+			if err := p.searchGlobalPackage(ctxt, p.ImportPath, srcDir, mode); err != nil {
 				return err
 			}
 		}
-	}
-
-	if p.LocalRoot == "" {
-		p.LocalRoot = ctxt.SearchLocalRoot(p.Dir)
 	}
 
 	return nil
@@ -401,17 +392,164 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string) error {
 
 // searchGlobalPackage find a global style package "x/y/z" form GoRoot/GoPath
 // p.ImportPath must have been setted
-func (p *PackagePath) searchGlobalPackage(imported string) error {
+func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string, mode ImportMode) error {
+
+	// tried records the location of unsuccessful package lookups
+	var tried struct {
+		vendor    []string
+		goroot    string
+		gopath    []string
+		localroot string
+	}
+	gopath := ctxt.gopath()
+	binaryOnly := false
+	pkga := ""
+
+	// Vendor directories get first chance to satisfy import.
+	if mode&IgnoreVendor == 0 && srcDir != "" {
+		searchVendor := func(root string, ptype PackageType) bool {
+			sub, ok := ctxt.hasSubdir(root, srcDir)
+			if !ok || !strings.HasPrefix(sub, "src/") || strings.Contains(sub, "/testdata/") {
+				return false
+			}
+			for sub != "" {
+				vendor := ctxt.joinPath(root, sub, "vendor")
+
+				//ignore local vendor if not search for local vendor
+				if !ptype.IsLocalPackage() && p.LocalRoot != "" {
+					if _, ok := ctxt.hasSubdir(p.LocalRoot, vendor); ok {
+						sub = parentDir(p.LocalRoot)
+						continue
+					}
+				}
+
+				if ctxt.isDir(vendor) {
+					dir := ctxt.joinPath(vendor, imported)
+					if ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
+						p.Dir = dir
+						p.ImportPath = pathpkg.Join(sub[:4], "vendor", imported) //remove prefix "src/"
+						p.Type = ptype
+						p.Root = root
+						p.IsVendor = true
+						return true
+					}
+					tried.vendor = append(tried.vendor, dir)
+				}
+				sub = parentDir(sub)
+			}
+			return false
+		}
+
+		//search local vendor first
+		if localRoot := p.searchLocalRoot(ctxt, srcDir); localRoot != "" {
+			if searchVendor(localRoot, PackageLocalRoot) {
+				p.Root = localRoot
+				goto Found
+			}
+		}
+		if searchVendor(ctxt.GOROOT, PackageGoRoot) {
+			goto Found
+		}
+		for _, root := range gopath {
+			if searchVendor(root, PackageGoPath) {
+				goto Found
+			}
+		}
+	}
+
+	// Determine directory from import path.
+
+	//search goroot
+	if ctxt.GOROOT != "" {
+		dir := ctxt.joinPath(ctxt.GOROOT, "src", imported)
+		isDir := ctxt.isDir(dir)
+		binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(ctxt.GOROOT, pkga))
+		if isDir || binaryOnly {
+			p.Dir = dir
+			p.Type = PackageGoRoot
+			p.Root = ctxt.GOROOT
+			goto Found
+		}
+		tried.goroot = dir
+	}
+	//search gopath
+	for _, root := range gopath {
+		dir := ctxt.joinPath(root, "src", imported)
+		isDir := ctxt.isDir(dir)
+		binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(root, pkga))
+		if isDir || binaryOnly {
+			p.Dir = dir
+			p.Root = root
+			p.Type = PackageGoPath
+			goto Found
+		}
+		tried.gopath = append(tried.gopath, dir)
+	}
+	//search local root
+	if localRoot := p.searchLocalRoot(ctxt, srcDir); localRoot != "" {
+		dir := ctxt.joinPath(localRoot, "src", imported)
+		isDir := ctxt.isDir(dir)
+		binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(localRoot, pkga))
+		if isDir || binaryOnly {
+			p.Dir = dir
+			p.Root = localRoot
+			p.Type = PackageLocalRoot
+			p.ImportPath = "#/" + p.ImportPath
+			goto Found
+		}
+		tried.localroot = dir
+	}
+
+	if true {
+		// package was not found
+		var paths []string
+		format := "\t%s (vendor tree)"
+		for _, dir := range tried.vendor {
+			paths = append(paths, fmt.Sprintf(format, dir))
+			format = "\t%s"
+		}
+		if tried.goroot != "" {
+			paths = append(paths, fmt.Sprintf("\t%s (from $GOROOT)", tried.goroot))
+		} else {
+			paths = append(paths, "\t($GOROOT not set)")
+		}
+		format = "\t%s (from $GOPATH)"
+		for _, dir := range tried.gopath {
+			paths = append(paths, fmt.Sprintf(format, dir))
+			format = "\t%s"
+		}
+		if len(tried.gopath) == 0 {
+			paths = append(paths, "\t($GOPATH not set. For more details see: 'go help gopath')")
+		}
+		if tried.localroot != "" {
+			paths = append(paths, fmt.Sprintf("\t%s (from $LocalRoot)", tried.localroot))
+		}
+
+		return fmt.Errorf("cannot find package %q in any of:\n%s", imported, strings.Join(paths, "\n"))
+	}
+
+Found:
+	p.searchLocalRoot(ctxt, srcDir)
+	p.genSignature()
 	return nil
+}
+
+func (p *PackagePath) searchLocalRoot(ctxt *Context, srcDir string) string {
+	if p.LocalRoot == "" {
+		p.LocalRoot = ctxt.SearchLocalRoot(srcDir)
+	}
+	return p.LocalRoot
 }
 
 // genSignature returns signature of a package
 // which is unique for every dir
 func (p *PackagePath) genSignature() {
-}
-
-func (info *PackagePath) Find(path, srcDir string) error {
-	return nil
+	switch {
+	case p.Type.IsStandAlonePackage() || p.Type.IsLocalPackage():
+		p.Signature = dirToImportPath(p.Dir)
+	default:
+		p.Signature = p.Style.RealImportPath(p.ImportPath)
+	}
 }
 
 func getwd() string {
@@ -420,6 +558,13 @@ func getwd() string {
 		panic("cannot determine current directory: " + err.Error())
 	}
 	return wd
+}
+
+func parentDir(dir string) string {
+	if i := strings.LastIndex(dir, "/"); i >= 0 {
+		return dir[:i]
+	}
+	return ""
 }
 
 // dirToImportPath returns the pseudo-import path we use for a package
