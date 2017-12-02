@@ -418,7 +418,7 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 				//ignore local vendor if not search for local vendor
 				if !ptype.IsLocalPackage() && p.LocalRoot != "" {
 					if _, ok := ctxt.hasSubdir(p.LocalRoot, vendor); ok {
-						sub = parentDir(p.LocalRoot)
+						sub = parentPath(p.LocalRoot)
 						continue
 					}
 				}
@@ -435,7 +435,7 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 					}
 					tried.vendor = append(tried.vendor, dir)
 				}
-				sub = parentDir(sub)
+				sub = parentPath(sub)
 			}
 			return false
 		}
@@ -529,6 +529,15 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 	}
 
 Found:
+	if p.Root != "" {
+		p.SrcRoot = ctxt.joinPath(p.Root, "src")
+		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
+		p.BinDir = ctxt.joinPath(p.Root, "bin")
+		if pkga != "" {
+			//p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
+			//p.PkgObj = ctxt.joinPath(p.Root, pkga)
+		}
+	}
 	p.searchLocalRoot(ctxt, srcDir)
 	p.genSignature()
 	return nil
@@ -560,9 +569,9 @@ func getwd() string {
 	return wd
 }
 
-func parentDir(dir string) string {
-	if i := strings.LastIndex(dir, "/"); i >= 0 {
-		return dir[:i]
+func parentPath(path string) string {
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		return path[:i]
 	}
 	return ""
 }
