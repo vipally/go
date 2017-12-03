@@ -591,12 +591,12 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 			p.Dir = ctxt.joinPath(srcDir, path)
 		}
 
-		// p.Dir directory may or may not exist. Gather partial information first, check if it exists later.
-		// Determine canonical import path, if any.
-		// Exclude results where the import path would include /testdata/.
-		inTestdata := func(sub string) bool {
-			return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
-		}
+		//		// p.Dir directory may or may not exist. Gather partial information first, check if it exists later.
+		//		// Determine canonical import path, if any.
+		//		// Exclude results where the import path would include /testdata/.
+		//		inTestdata := func(sub string) bool {
+		//			return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
+		//		}
 
 		//Ally: find if this path is in a local root
 		if searchLocalRoot() != "" {

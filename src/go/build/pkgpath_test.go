@@ -1,3 +1,7 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package build
 
 import (
@@ -109,6 +113,8 @@ func TestFormatImportPath(t *testing.T) {
 		&_Case{".", "notexist", fmt.Errorf(`import "%s": cannot find package at v:\notexist`, "."), &_Want{}},
 		&_Case{".", "__goroot__/src/notexist", fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir(`__goroot__\src\notexist`)), &_Want{}},
 		&_Case{".", "gopath1/src/notexist", fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir("gopath1/src/notexist")), &_Want{}},
+		&_Case{".", "noroot1/testdata/local1", fmt.Errorf(`import "%s": cannot refer package under testdata %s`, ".", vdir(`noroot1\testdata\local1`)), &_Want{}},
+		&_Case{".", "localroot1/src/testdata/local1", fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
 
 		&_Case{"#/x/y/z", "notexist", nil, &_Want{ImportPath: "#/x/y/z", Dir: vdir(``), Root: vdir(``), Type: PackageUnknown, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: false}},
 		&_Case{"x/y/z", "notexist", nil, &_Want{ImportPath: "x/y/z", Dir: vdir(``), Root: vdir(``), Type: PackageUnknown, Style: ImportStyleGlobal, ConflictDir: "", Formated: false}},
@@ -116,8 +122,6 @@ func TestFormatImportPath(t *testing.T) {
 		&_Case{".//local1", "noroot1", nil, &_Want{ImportPath: "", Dir: vdir(`noroot1\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleRelated, ConflictDir: "", Formated: true}},
 		&_Case{"./local1", "noroot1", nil, &_Want{ImportPath: "", Dir: vdir(`noroot1\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleRelated, ConflictDir: "", Formated: true}},
 		&_Case{"..", "noroot1/local1", nil, &_Want{ImportPath: "", Dir: vdir(`noroot1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleRelated, ConflictDir: "", Formated: true}},
-		&_Case{".", "noroot1/testdata/local1", nil, &_Want{ImportPath: "", Dir: vdir(`noroot1\testdata\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleSelf, ConflictDir: "", Formated: true}},
-		&_Case{".", "localroot1/src/testdata/local1", nil, &_Want{ImportPath: "", Dir: vdir(`localroot1\src\testdata\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleSelf, ConflictDir: "", Formated: true}},
 		&_Case{".", "localroot1/src/local1", nil, &_Want{ImportPath: "#/local1", Dir: vdir(`localroot1\src\local1`), Root: vdir(`localroot1`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
 		&_Case{".", "gopath1/src/localroot1/src/local1", nil, &_Want{ImportPath: "#/local1", Dir: vdir(`gopath1\src\localroot1\src\local1`), Root: vdir(`gopath1\src\localroot1`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
 		&_Case{".", "gopath1/src/local1", nil, &_Want{ImportPath: "#/local1", Dir: vdir(`gopath1\src\local1`), Root: vdir(`gopath1`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
@@ -139,7 +143,7 @@ func TestFormatImportPath(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(&formated, testCase.want) {
-			fmt.Printf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &formated)
+			t.Errorf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &formated)
 		}
 	}
 }
@@ -161,6 +165,9 @@ func TestFindImport(t *testing.T) {
 		&_Case{".", "notexist", 0, fmt.Errorf(`import "%s": cannot find package at v:\notexist`, "."), &_Want{}},
 		&_Case{".", "__goroot__/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir(`__goroot__\src\notexist`)), &_Want{}},
 		&_Case{".", "gopath1/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir("gopath1/src/notexist")), &_Want{}},
+		&_Case{".", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
+		&_Case{"#/testdata/local1", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
+		&_Case{"testdata/local1", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "testdata/local1"), &_Want{}},
 
 		&_Case{"#/xx", "notexist", 0, fmt.Errorf(`import "%s": cannot find local-root(with sub-tree "<root>/src/vendor/") up from %s`, "#/xx", vdir("notexist")), &_Want{}},
 		&_Case{"xx", "notexist", 0, fmt.Errorf("cannot find package %q in any of:\n%s", "xx", strings.Join([]string{
@@ -180,6 +187,12 @@ func TestFindImport(t *testing.T) {
 			tvdir(`gopath3\src\xx`),
 			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\xx (from #LocalRoot)`),
 		}, "\n")), &_Want{}},
+
+		//		&_Case{".", "localroot1/src/sole", 0, nil, &_Want{}},
+		//		&_Case{"sole", "localroot1/src/sole", 0, nil, &_Want{}},
+		//		&_Case{"#/sole", "localroot1/src/sole", 0, nil, &_Want{}},
+		//		&_Case{"vendored", "localroot1/src/sole", 0, nil, &_Want{}},
+		//		&_Case{"#/vendored", "localroot1/src/sole", 0, nil, &_Want{}},
 	}
 	for i, testCase := range testCases {
 		var pp PackagePath
@@ -189,19 +202,18 @@ func TestFindImport(t *testing.T) {
 		errEq := reflect.DeepEqual(err, testCase.wantErr)
 		if testCase.wantErr != nil || !errEq {
 			if !errEq {
-				t.Errorf("FormatImportPath [%d %q %s] wantErr=[%+v] gotErr: [%+v]", i+1, testCase.imported, dir, testCase.wantErr, err)
+				t.Errorf("FindImport [%d %q %s] wantErr=[%+v] gotErr: [%+v] \n[%+v]", i+1, testCase.imported, dir, testCase.wantErr, err, &pp)
 			}
 			continue
 		}
 
 		if !reflect.DeepEqual(&pp, testCase.want) {
-			fmt.Printf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &pp)
+			t.Errorf("FindImport[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &pp)
 		}
 
 		if false {
 			fmt.Printf("%d FindImport(%q, %s)=%+v %v\n", i+1, testCase.imported, dir, pp, err)
 		}
-
 	}
 }
 

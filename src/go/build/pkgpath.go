@@ -22,6 +22,12 @@ var (
 	gblSrcs   = Default.SrcDirs()                       // GoRoot/src & GoPaths/src
 )
 
+//match "." ".." "./xxx" "../xxx"
+//var relatedRE = regexp.MustCompile(`^\.{1,2}(?:/.+)*?`)
+
+//match "/testdata/" or "\\testdata\\"
+var testdataRE = regexp.MustCompile(`(?:^|\\|/)testdata(?:$|\\|/)`)
+
 // match "<root>/src/..." case to find <root>
 var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
 
@@ -104,12 +110,16 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 
 			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
 				localRootSrc := ctxt.joinPath(localRoot, "src")
-				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ && !inTestdata(sub) {
+				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
+					importPath := "#"
 					if sub != "" && sub != "." {
-						fi.ImportPath = "#/" + sub
-					} else {
-						fi.ImportPath = "#"
+						importPath = "#/" + sub
 					}
+					if inTestdata(sub) {
+						err = fmt.Errorf("import %q: cannot refer package under testdata", importPath)
+						return
+					}
+					fi.ImportPath = importPath
 					fi.Root = localRoot
 					fi.Type = PackageLocalRoot
 					fi.Style = ImportStyleLocalRoot
@@ -118,6 +128,11 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			}
 
 			if ok := fi.findGlobalRoot(ctxt, fi.Dir); ok {
+				return
+			}
+
+			if inTestdata(filepath.ToSlash(fi.Dir)) {
+				err = fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
 				return
 			}
 
@@ -274,8 +289,14 @@ func GetImportStyle(imported string) (ImportStyle, error) {
 		if len(imported) == 1 {
 			return ImportStyleSelf, nil
 		} else {
-			if imported == ".." || strings.HasPrefix(imported, "./") || strings.HasPrefix(imported, "../") {
+			second := imported[1]
+			switch second {
+			case '/':
 				return ImportStyleRelated, nil
+			case '.':
+				if len(imported) == 2 || imported[2] == '/' {
+					return ImportStyleRelated, nil
+				}
 			}
 		}
 	case lead == '#':
@@ -389,14 +410,17 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode Im
 			if localRoot == "" {
 				return fmt.Errorf(`import %q: cannot find local-root(with sub-tree "<root>/src/vendor/") up from %s`, imported, srcDir)
 			}
+			if inTestdata(imported) {
+				return fmt.Errorf("import %q: cannot refer package under testdata", imported)
+			}
 			p.Type = PackageLocalRoot
 			p.LocalRoot = localRoot
 			p.ImportPath = imported
 
 			relPath := style.RealImportPath(imported)
 			dir := ""
-			if dir = ctxt.joinPath(localRoot, "src", "vendor", relPath); !ctxt.isDir(p.Dir) {
-				if dir = ctxt.joinPath(localRoot, "src", relPath); !ctxt.isDir(p.Dir) {
+			if dir = ctxt.joinPath(localRoot, "src", "vendor", relPath); !ctxt.isDir(dir) {
+				if dir = ctxt.joinPath(localRoot, "src", relPath); !ctxt.isDir(dir) {
 					return fmt.Errorf("import %q: cannot find sub-package under local-root %s", imported, p.LocalRoot)
 				}
 			}
@@ -404,7 +428,7 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode Im
 			p.Root = localRoot
 
 		case style.IsGlobal(): //import "x/y/z" style
-			if err := p.searchGlobalPackage(ctxt, p.ImportPath, srcDir, mode); err != nil {
+			if err := p.findGlobalPackage(ctxt, p.ImportPath, srcDir, mode); err != nil {
 				return err
 			}
 		}
@@ -415,7 +439,11 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode Im
 
 // searchGlobalPackage find a global style package "x/y/z" form GoRoot/GoPath
 // p.ImportPath must have been setted
-func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string, mode ImportMode) error {
+func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, mode ImportMode) error {
+
+	if inTestdata(imported) {
+		return fmt.Errorf("import %q: cannot refer package under testdata", imported)
+	}
 
 	// tried records the location of unsuccessful package lookups
 	var tried struct {
@@ -431,8 +459,9 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 	// Vendor directories get first chance to satisfy import.
 	if mode&IgnoreVendor == 0 && srcDir != "" {
 		searchVendor := func(root string, ptype PackageType) bool {
+
 			sub, ok := ctxt.hasSubdir(root, srcDir)
-			if !ok || !strings.HasPrefix(sub, "src/") || strings.Contains(sub, "/testdata/") {
+			if !ok || !strings.HasPrefix(sub, "src/") || inTestdata(sub) {
 				return false
 			}
 
@@ -630,7 +659,7 @@ func makeImportValid(r rune) rune {
 // Determine canonical import path, if any.
 // Exclude results where the import path would include /testdata/.
 func inTestdata(sub string) bool {
-	return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
+	return testdataRE.MatchString(sub)
 }
 
 // IsValidImport verify if imported is a valid import string
