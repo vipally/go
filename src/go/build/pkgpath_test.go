@@ -2,27 +2,67 @@ package build
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 var (
-	fsRoot      = testContext.joinPath(getwd(), "testdata/fsroot")
+	fsRoot      = testContext.joinPath(getwd(), "testdata/vroot")
 	testContext = defaultContext()
+	vroot       = "/" //virtual fs root
+	thidDir     = getwd()
 )
 
 func init() {
-	testContext.GOROOT = testContext.joinPath(getwd(), "../../..")
+	if testContext.GOOS == "windows" {
+		vroot = `v:\`
+	}
+	testContext.IsDir = func(vdir string) bool {
+		dir := full(vdir)
+		fi, err := os.Stat(dir)
+		return err == nil && fi.IsDir()
+	}
+	testContext.OpenFile = func(vdir string) (io.ReadCloser, error) {
+		dir := full(vdir)
+		f, err := os.Open(dir)
+		if err != nil {
+			return nil, err // nil interface
+		}
+		return f, nil
+	}
+	testContext.GOROOT = vdir("__goroot__")
 	goRootSrc = testContext.joinPath(testContext.GOROOT, "src")
-	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", full("gopath1"), filepath.ListSeparator, full("gopath2"), filepath.ListSeparator, full("gopath3"))
+	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", vdir("gopath1"), filepath.ListSeparator, vdir("gopath2"), filepath.ListSeparator, vdir("gopath3"))
 	gblSrcs = testContext.SrcDirs()
 }
 
-func setWd(dir string) {
-	wd = dir
-}
-func full(related string) string {
-	return testContext.joinPath(fsRoot, related)
+func TestSearchLocalRoot(t *testing.T) {
+	//	testCases := [][]string{
+	//		[]string{},
+	//	}
+	fmt.Printf("%+v\n", gblSrcs)
+	fmt.Printf("%+v\n", testContext.GOROOT)
+	fmt.Printf("%+v\n", goRootSrc)
+	fmt.Printf("%+v\n", full(goRootSrc))
+	fmt.Printf("%+v\n", gblSrcs[0])
+	fmt.Printf("%+v\n", full(gblSrcs[0]))
+	fmt.Printf("%+v\n", testContext.SearchLocalRoot(vdir(`localroot1\src\vendor`)))
 }
 
-func TestA(t *testing.T) {}
+func setWd(dir string) {
+	wd = vdir(dir)
+}
+
+func full(vdir string) string {
+	if sub, ok := testContext.hasSubdir(testContext.GOROOT, vdir); ok {
+		return testContext.joinPath(thidDir, "../../..", sub) //real goroot
+	}
+	return testContext.joinPath(fsRoot, strings.TrimPrefix(vdir, vroot)) //related to fsRoot
+}
+
+func vdir(related string) string {
+	return testContext.joinPath(vroot, related)
+}
