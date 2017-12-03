@@ -1,4 +1,4 @@
-package vendor
+package local1
 
 /* test
 import (

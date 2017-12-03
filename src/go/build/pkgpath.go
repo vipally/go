@@ -8,7 +8,6 @@ package build
 
 import (
 	"fmt"
-	"go/parser"
 	"os"
 	pathpkg "path"
 	"path/filepath"
@@ -49,8 +48,10 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 		// match[0 ]= []string{"c:\\root\\src\\prj\\src\\", "c:\\root\\src\\prj"}
 		if match := srcRE.FindAllStringSubmatch(dir, 1); match != nil {
 			withSrc, dir = match[0][0], match[0][1]
-			if vendor := ctxt.joinPath(withSrc, "vendor"); ctxt.isDir(vendor) {
-				return filepath.Clean(dir)
+			if _, ok := ctxt.hasSubdir(ctxt.GOROOT, dir); !ok { //do not match LocalRoot under GoRoot
+				if vendor := ctxt.joinPath(withSrc, "vendor"); ctxt.isDir(vendor) {
+					return filepath.Clean(dir)
+				}
 			}
 		} else {
 			break
@@ -103,7 +104,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 
 			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
 				localRootSrc := ctxt.joinPath(localRoot, "src")
-				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
+				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ && !inTestdata(sub) {
 					if sub != "" && sub != "." {
 						fi.ImportPath = "#/" + sub
 					} else {
@@ -121,7 +122,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			}
 
 			//StandAlone package out of LocalPath/GoRoot/GoPath
-			fi.ImportPath = imported
+			fi.ImportPath = ""
 			fi.Type = PackageStandAlone
 		} else {
 			err = fmt.Errorf("import %q: cannot find package at %s", imported, dir)
@@ -135,7 +136,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	findRootSrc := ""
 	for _, rootsrc := range gblSrcs {
-		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok {
+		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok && !inTestdata(sub) {
 			fi.ImportPath = sub
 			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
 			fi.Style = ImportStyleGlobal
@@ -254,12 +255,19 @@ func (st ImportStyle) FullImportPath(imported, root string) string {
 }
 
 func GetImportStyle(imported string) (ImportStyle, error) {
-	if imported == "" || !parser.IsValidImport(imported) {
+	if imported == "" {
 		return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
 	}
 	if imported[0] == '/' {
 		return ImportStyleUnknown, fmt.Errorf("import %q: cannot import absolute path", imported)
 	}
+
+	// syntax check is not required here
+	//
+	// parser.IsValidImport(".") will return false which is not expected
+	//	if imported != "." && !parser.IsValidImport(imported) {
+	//		return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
+	//	}
 
 	switch lead := imported[0]; {
 	case lead == '.':
@@ -315,15 +323,15 @@ func (t PackageType) IsGlobalPackage() bool     { return t == PackageGoPath }
 func (t PackageType) String() string {
 	switch t {
 	case PackageStandAlone:
-		return "StandAlone"
+		return "PackageStandAlone"
 	case PackageLocalRoot:
-		return "LocalRoot"
+		return "PackageLocalRoot"
 	case PackageGoRoot:
-		return "GoRoot"
+		return "PackageGoRoot"
 	case PackageGoPath:
-		return "GoPath"
+		return "PackageGoPath"
 	}
-	return "Unknown"
+	return "PackageUnknown"
 }
 
 // PackagePath represent path information of a package
@@ -601,6 +609,13 @@ func makeImportValid(r rune) rune {
 		return '_'
 	}
 	return r
+}
+
+// p.Dir directory may or may not exist. Gather partial information first, check if it exists later.
+// Determine canonical import path, if any.
+// Exclude results where the import path would include /testdata/.
+func inTestdata(sub string) bool {
+	return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
 }
 
 // IsValidImport verify if imported is a valid import string

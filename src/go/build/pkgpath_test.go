@@ -26,7 +26,9 @@ func init() {
 	testContext.IsDir = func(vdir string) bool {
 		dir := full(vdir)
 		fi, err := os.Stat(dir)
-		return err == nil && fi.IsDir()
+		ok := err == nil && fi.IsDir()
+		//fmt.Println("IsDir", vdir, dir, ok)
+		return ok
 	}
 	testContext.OpenFile = func(vdir string) (io.ReadCloser, error) {
 		dir := full(vdir)
@@ -71,8 +73,8 @@ func TestSearchLocalRoot(t *testing.T) {
 		[]string{"gopath1/src/localroot1", "gopath1"},
 		[]string{"gopath1/src/localroot1/src", "gopath1/src/localroot1"},
 		[]string{"__goroot__", ""},
-		[]string{"__goroot__/src", "__goroot__"},
-		[]string{"__goroot__/src/fmt", "__goroot__"},
+		[]string{"__goroot__/src", ""},
+		[]string{"__goroot__/src/fmt", ""},
 	}
 	for _, testCase := range testCases {
 		dir, want := vdir(testCase[0]), vdir(testCase[1])
@@ -88,6 +90,58 @@ func TestSearchLocalRoot(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestFormatImportPath(t *testing.T) {
+	type _Want = FormatImport
+
+	type _Case struct {
+		imported string
+		dir      string
+		wantErr  bool
+		want     *_Want
+	}
+	testCases := []*_Case{
+		&_Case{"", "noroot1", true, &_Want{}},
+		&_Case{"/x/y/z", "noroot1", true, &_Want{}},
+		&_Case{"//x/y/z", "noroot1", true, &_Want{}},
+		&_Case{".", "notexist", true, &_Want{}},
+		&_Case{".", "__goroot__/src/notexist", true, &_Want{}},
+		&_Case{".", "gopath1/src/notexist", true, &_Want{}},
+
+		&_Case{"#/x/y/z", "notexist", false, &_Want{}},
+		&_Case{"x/y/z", "notexist", false, &_Want{}},
+		&_Case{".", "noroot1", false, &_Want{}},
+		&_Case{".//local1", "noroot1", false, &_Want{}},
+		&_Case{"./local1", "noroot1", false, &_Want{}},
+		&_Case{"..", "noroot1/local1", false, &_Want{}},
+		&_Case{".", "noroot1/testdata/local1", false, &_Want{}},
+		&_Case{".", "localroot1/src/testdata/local1", false, &_Want{}},
+		&_Case{".", "localroot1/src/local1", false, &_Want{}},
+		&_Case{".", "gopath1/src/localroot1/src/local1", false, &_Want{}},
+		&_Case{".", "gopath1/src/local1", false, &_Want{}},
+		&_Case{".", "gopath2/src/local2", false, &_Want{}},
+		&_Case{".", "gopath2/src/localroot2/src/local2", false, &_Want{}},
+		&_Case{".", "__goroot__/src/fmt", false, &_Want{}},
+	}
+	for i, testCase := range testCases {
+		dir := vdir(testCase.dir)
+		formated, err := testContext.FormatImportPath(testCase.imported, dir)
+		gotErr := err != nil
+
+		//fmt.Printf("%d FormatImportPath(%q, %s)=%+v %v\n", i, testCase.imported, dir, formated, err)
+
+		if testCase.wantErr || gotErr != testCase.wantErr {
+			if gotErr != testCase.wantErr {
+				t.Errorf("FormatImportPath [%d %q %s] wantErr=%v gotErr: [%+v]", i+1, testCase.imported, dir, testCase.wantErr, err)
+			}
+			continue
+		}
+		if !reflect.DeepEqual(&formated, testCase.want) {
+			fmt.Printf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, &formated, testCase.want)
+		}
+
 	}
 }
 
