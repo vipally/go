@@ -366,17 +366,21 @@ func (p *PackagePath) FindImportFromWd(ctxt *Context, imported string, mode Impo
 	return p.FindImport(ctxt, imported, wd, mode)
 }
 
+func (p *PackagePath) copyFromFormatImport(fmted *FormatImport) {
+	p.Type = fmted.Type
+	p.Root = fmted.Root
+	p.ImportPath = fmted.ImportPath
+	p.Dir = fmted.Dir
+	p.Style = fmted.Style
+}
+
 func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode ImportMode) error {
 	var fmted FormatImport
 	if err := fmted.FormatImportPath(ctxt, imported, srcDir); err != nil {
 		return err
 	}
 
-	p.Type = fmted.Type
-	p.Root = fmted.Root
-	p.ImportPath = fmted.ImportPath
-	p.Dir = fmted.Dir
-	p.Style = fmted.Style
+	p.copyFromFormatImport(&fmted)
 
 	if !fmted.Formated { //not import "./../foo" style
 		switch style := fmted.Style; {
@@ -431,16 +435,20 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 			if !ok || !strings.HasPrefix(sub, "src/") || strings.Contains(sub, "/testdata/") {
 				return false
 			}
+
+			//ignore local vendor if not search for local vendor
+			if !ptype.IsLocalPackage() && p.LocalRoot != "" {
+				if _, ok := ctxt.hasSubdir(p.LocalRoot, srcDir); ok {
+					parent := parentPath(p.LocalRoot)
+					sub, _ = ctxt.hasSubdir(root, parent)
+				}
+			}
+
 			for sub != "" {
 				vendor := ctxt.joinPath(root, sub, "vendor")
 
-				//ignore local vendor if not search for local vendor
-				if !ptype.IsLocalPackage() && p.LocalRoot != "" {
-					if _, ok := ctxt.hasSubdir(p.LocalRoot, vendor); ok {
-						sub = parentPath(p.LocalRoot)
-						continue
-					}
-				}
+				//				fmt.Printf("search vendor: \n\troot[%s] \n\ttype[%v] \n\tsub[%s] \n\tvendor[%s]\n\tLocalRoot[%s]\n",
+				//					root, ptype, sub, vendor, p.LocalRoot)
 
 				if ctxt.isDir(vendor) {
 					dir := ctxt.joinPath(vendor, imported)
@@ -541,7 +549,7 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 			paths = append(paths, "\t($GOPATH not set. For more details see: 'go help gopath')")
 		}
 		if tried.localroot != "" {
-			paths = append(paths, fmt.Sprintf("\t%s (from $LocalRoot)", tried.localroot))
+			paths = append(paths, fmt.Sprintf("\t%s (from #LocalRoot)", tried.localroot))
 		}
 
 		return fmt.Errorf("cannot find package %q in any of:\n%s", imported, strings.Join(paths, "\n"))
@@ -589,8 +597,11 @@ func getwd() string {
 }
 
 func parentPath(path string) string {
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		return path[:i]
+	for i := len(path) - 1; i >= 0; i-- {
+		c := path[i]
+		if c == '\\' || c == '/' {
+			return path[:i]
+		}
 	}
 	return ""
 }

@@ -161,6 +161,25 @@ func TestFindImport(t *testing.T) {
 		&_Case{".", "notexist", 0, fmt.Errorf(`import "%s": cannot find package at v:\notexist`, "."), &_Want{}},
 		&_Case{".", "__goroot__/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir(`__goroot__\src\notexist`)), &_Want{}},
 		&_Case{".", "gopath1/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir("gopath1/src/notexist")), &_Want{}},
+
+		&_Case{"#/xx", "notexist", 0, fmt.Errorf(`import "%s": cannot find local-root(with sub-tree "<root>/src/vendor/") up from %s`, "#/xx", vdir("notexist")), &_Want{}},
+		&_Case{"xx", "notexist", 0, fmt.Errorf("cannot find package %q in any of:\n%s", "xx", strings.Join([]string{
+			tvdir(`__goroot__\src\xx (from $GOROOT)`),
+			tvdir(`gopath1\src\xx (from $GOPATH)`),
+			tvdir(`gopath2\src\xx`),
+			tvdir(`gopath3\src\xx`),
+		}, "\n")), &_Want{}},
+		&_Case{"xx", `gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\local1`, 0, fmt.Errorf("cannot find package %q in any of:\n%s", "xx", strings.Join([]string{
+			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\vendor\xx (vendor tree)`),
+			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\xx`),
+			tvdir(`gopath1\src\localroot1\src\vendor\xx`),
+			tvdir(`gopath1\src\vendor\xx`),
+			tvdir(`__goroot__\src\xx (from $GOROOT)`),
+			tvdir(`gopath1\src\xx (from $GOPATH)`),
+			tvdir(`gopath2\src\xx`),
+			tvdir(`gopath3\src\xx`),
+			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\xx (from #LocalRoot)`),
+		}, "\n")), &_Want{}},
 	}
 	for i, testCase := range testCases {
 		var pp PackagePath
@@ -179,7 +198,7 @@ func TestFindImport(t *testing.T) {
 			fmt.Printf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &pp)
 		}
 
-		if true {
+		if false {
 			fmt.Printf("%d FindImport(%q, %s)=%+v %v\n", i+1, testCase.imported, dir, pp, err)
 		}
 
@@ -205,4 +224,8 @@ func vdir(related string) string {
 		return ""
 	}
 	return testContext.joinPath(vroot, `/`, related)
+}
+
+func tvdir(s string) string {
+	return "\t" + vdir(s)
 }
