@@ -15,7 +15,7 @@ var (
 	testContext = defaultContext()
 	vroot       = "/" //virtual fs root
 	thidDir     = getwd()
-	showResult  = true
+	showResult  = false
 )
 
 func init() {
@@ -110,20 +110,20 @@ func TestFormatImportPath(t *testing.T) {
 		&_Case{".", "__goroot__/src/notexist", true, &_Want{}},
 		&_Case{".", "gopath1/src/notexist", true, &_Want{}},
 
-		&_Case{"#/x/y/z", "notexist", false, &_Want{}},
-		&_Case{"x/y/z", "notexist", false, &_Want{}},
-		&_Case{".", "noroot1", false, &_Want{}},
-		&_Case{".//local1", "noroot1", false, &_Want{}},
-		&_Case{"./local1", "noroot1", false, &_Want{}},
-		&_Case{"..", "noroot1/local1", false, &_Want{}},
-		&_Case{".", "noroot1/testdata/local1", false, &_Want{}},
-		&_Case{".", "localroot1/src/testdata/local1", false, &_Want{}},
-		&_Case{".", "localroot1/src/local1", false, &_Want{}},
-		&_Case{".", "gopath1/src/localroot1/src/local1", false, &_Want{}},
-		&_Case{".", "gopath1/src/local1", false, &_Want{}},
-		&_Case{".", "gopath2/src/local2", false, &_Want{}},
-		&_Case{".", "gopath2/src/localroot2/src/local2", false, &_Want{}},
-		&_Case{".", "__goroot__/src/fmt", false, &_Want{}},
+		&_Case{"#/x/y/z", "notexist", false, &_Want{ImportPath: "#/x/y/z", Dir: vdir(``), Root: vdir(``), Type: PackageUnknown, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: false}},
+		&_Case{"x/y/z", "notexist", false, &_Want{ImportPath: "x/y/z", Dir: vdir(``), Root: vdir(``), Type: PackageUnknown, Style: ImportStyleGlobal, ConflictDir: "", Formated: false}},
+		&_Case{".", "noroot1", false, &_Want{ImportPath: "", Dir: vdir(`noroot1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleSelf, ConflictDir: "", Formated: true}},
+		&_Case{".//local1", "noroot1", false, &_Want{ImportPath: "", Dir: vdir(`noroot1\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleRelated, ConflictDir: "", Formated: true}},
+		&_Case{"./local1", "noroot1", false, &_Want{ImportPath: "", Dir: vdir(`noroot1\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleRelated, ConflictDir: "", Formated: true}},
+		&_Case{"..", "noroot1/local1", false, &_Want{ImportPath: "", Dir: vdir(`noroot1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleRelated, ConflictDir: "", Formated: true}},
+		&_Case{".", "noroot1/testdata/local1", false, &_Want{ImportPath: "", Dir: vdir(`noroot1\testdata\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleSelf, ConflictDir: "", Formated: true}},
+		&_Case{".", "localroot1/src/testdata/local1", false, &_Want{ImportPath: "", Dir: vdir(`localroot1\src\testdata\local1`), Root: vdir(``), Type: PackageStandAlone, Style: ImportStyleSelf, ConflictDir: "", Formated: true}},
+		&_Case{".", "localroot1/src/local1", false, &_Want{ImportPath: "#/local1", Dir: vdir(`localroot1\src\local1`), Root: vdir(`localroot1`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
+		&_Case{".", "gopath1/src/localroot1/src/local1", false, &_Want{ImportPath: "#/local1", Dir: vdir(`gopath1\src\localroot1\src\local1`), Root: vdir(`gopath1\src\localroot1`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
+		&_Case{".", "gopath1/src/local1", false, &_Want{ImportPath: "#/local1", Dir: vdir(`gopath1\src\local1`), Root: vdir(`gopath1`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
+		&_Case{".", "gopath2/src/local2", false, &_Want{ImportPath: "local2", Dir: vdir(`gopath2\src\local2`), Root: vdir(`gopath2`), Type: PackageGoPath, Style: ImportStyleGlobal, ConflictDir: vdir(`gopath1\src\local2`), Formated: true}},
+		&_Case{".", "gopath2/src/localroot2/src/local2", false, &_Want{ImportPath: "#/local2", Dir: vdir(`gopath2\src\localroot2\src\local2`), Root: vdir(`gopath2\src\localroot2`), Type: PackageLocalRoot, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: true}},
+		&_Case{".", "__goroot__/src/fmt", false, &_Want{ImportPath: "fmt", Dir: vdir(`__goroot__\src\fmt`), Root: vdir(`__goroot__`), Type: PackageGoRoot, Style: ImportStyleGlobal, ConflictDir: "", Formated: true}},
 	}
 	for i, testCase := range testCases {
 		dir := vdir(testCase.dir)
@@ -139,7 +139,7 @@ func TestFormatImportPath(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(&formated, testCase.want) {
-			fmt.Printf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, &formated, testCase.want)
+			fmt.Printf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &formated)
 		}
 
 	}
