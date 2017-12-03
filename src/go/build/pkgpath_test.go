@@ -17,8 +17,9 @@ var (
 )
 
 func init() {
+	//testContext.GOOS = "linux"
 	if testContext.GOOS == "windows" {
-		vroot = `v:\`
+		vroot = `v:`
 	}
 	testContext.IsDir = func(vdir string) bool {
 		dir := full(vdir)
@@ -34,15 +35,9 @@ func init() {
 		return f, nil
 	}
 	testContext.GOROOT = vdir("__goroot__")
-	goRootSrc = testContext.joinPath(testContext.GOROOT, "src")
 	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", vdir("gopath1"), filepath.ListSeparator, vdir("gopath2"), filepath.ListSeparator, vdir("gopath3"))
-	gblSrcs = testContext.SrcDirs()
-}
+	testContext.RefreshEnv()
 
-func TestSearchLocalRoot(t *testing.T) {
-	//	testCases := [][]string{
-	//		[]string{},
-	//	}
 	fmt.Printf("%+v\n", gblSrcs)
 	fmt.Printf("%+v\n", testContext.GOROOT)
 	fmt.Printf("%+v\n", goRootSrc)
@@ -50,6 +45,14 @@ func TestSearchLocalRoot(t *testing.T) {
 	fmt.Printf("%+v\n", gblSrcs[0])
 	fmt.Printf("%+v\n", full(gblSrcs[0]))
 	fmt.Printf("%+v\n", testContext.SearchLocalRoot(vdir(`localroot1\src\vendor`)))
+	fmt.Printf("%+v\n", full("v:\\"))
+}
+
+func TestSearchLocalRoot(t *testing.T) {
+	//	testCases := [][]string{
+	//		[]string{},
+	//	}
+
 }
 
 func setWd(dir string) {
@@ -64,5 +67,5 @@ func full(vdir string) string {
 }
 
 func vdir(related string) string {
-	return testContext.joinPath(vroot, related)
+	return testContext.joinPath(vroot, `/`, related)
 }

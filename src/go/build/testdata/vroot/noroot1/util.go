@@ -5,6 +5,10 @@ import (
 	"runtime"
 )
 
+func PackageMain() {
+
+}
+
 func GetPackagePath() string {
 	depth := 0
 	if _, __file, _, __ok := runtime.Caller(depth); __ok {

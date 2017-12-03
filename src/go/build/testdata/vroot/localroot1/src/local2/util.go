@@ -1,9 +1,14 @@
-package vendor
+package noroot1
 
+/* test
 import (
 	"path/filepath"
 	"runtime"
 )
+
+func PackageMain() {
+
+}
 
 func GetPackagePath() string {
 	depth := 0
@@ -12,4 +17,9 @@ func GetPackagePath() string {
 		return thisFilePath
 	}
 	return ""
+} //
+//*/
+
+func init() {
+
 }

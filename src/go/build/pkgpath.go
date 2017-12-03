@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	wd        = getwd()                              // current working dir
-	goRootSrc = filepath.Join(Default.GOROOT, "src") // GoRoot/src
-	gblSrcs   = Default.SrcDirs()                    // GoRoot/src & GoPaths/src
+	wd        = getwd()                                 // current working dir
+	goRootSrc = Default.joinPath(Default.GOROOT, "src") // GoRoot/src
+	gblSrcs   = Default.SrcDirs()                       // GoRoot/src & GoPaths/src
 )
 
 // match "<root>/src/..." case to find <root>
@@ -57,6 +57,13 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 		}
 	}
 	return ""
+}
+
+// RefreshEnv refresh the global vars based on build context
+func (ctxt *Context) RefreshEnv() {
+	wd = getwd()                                  // current working dir
+	goRootSrc = ctxt.joinPath(ctxt.GOROOT, "src") // GoRoot/src
+	gblSrcs = ctxt.SrcDirs()                      // GoRoot/src & GoPaths/src
 }
 
 // FormatImportPath convert "." "./x/y/z" "../x/y/z" style import path to "#/x/y/z" "x/y/z" style if possible.
