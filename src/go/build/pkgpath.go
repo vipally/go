@@ -336,14 +336,14 @@ func (t PackageType) String() string {
 
 // PackagePath represent path information of a package
 type PackagePath struct {
-	ImportPath  string      // Regular original import path like: "x/y/z" "#/x/y/z" "./foo" "../foo" "#" "."
-	Dir         string      // Dir of imported package
-	Signature   string      // Signature of imported package, which is unique for every package Dir
-	LocalRoot   string      // LocalRoot of imported package
-	Root        string      // Root of imported package
-	SrcRoot     string      // package source root directory ("" if unknown)
-	PkgRoot     string      // package install root directory ("" if unknown)
-	BinDir      string      // command install directory ("" if unknown)
+	ImportPath string // Regular original import path like: "x/y/z" "#/x/y/z" "./foo" "../foo" "#" "."
+	Dir        string // Dir of imported package
+	Signature  string // Signature of imported package, which is unique for every package Dir
+	LocalRoot  string // LocalRoot of imported package
+	Root       string // Root of imported package
+	//	SrcRoot     string      // package source root directory ("" if unknown)
+	//	PkgRoot     string      // package install root directory ("" if unknown)
+	//	BinDir      string      // command install directory ("" if unknown)
 	ConflictDir string      // this directory shadows Dir in $GOPATH
 	IsVendor    bool        // From vendor path
 	Type        PackageType // PackageType of this package
@@ -353,9 +353,13 @@ type PackagePath struct {
 func (p *PackagePath) Init() {
 	p.ImportPath = ""
 	p.Dir = ""
-	p.Root = ""
 	p.Signature = ""
-	p.Type = 0
+	p.LocalRoot = ""
+	p.Root = ""
+	p.ConflictDir = ""
+	p.IsVendor = false
+	p.Type = PackageUnknown
+	p.Style = ImportStyleUnknown
 }
 
 func (p *PackagePath) FindImportFromWd(ctxt *Context, imported string, mode ImportMode) error {
@@ -544,15 +548,15 @@ func (p *PackagePath) searchGlobalPackage(ctxt *Context, imported, srcDir string
 	}
 
 Found:
-	if p.Root != "" {
-		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
-		p.BinDir = ctxt.joinPath(p.Root, "bin")
-		if pkga != "" {
-			//p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
-			//p.PkgObj = ctxt.joinPath(p.Root, pkga)
-		}
-	}
+	//	if p.Root != "" {
+	//		p.SrcRoot = ctxt.joinPath(p.Root, "src")
+	//		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
+	//		p.BinDir = ctxt.joinPath(p.Root, "bin")
+	//		if pkga != "" {
+	//			//p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
+	//			//p.PkgObj = ctxt.joinPath(p.Root, pkga)
+	//		}
+	//	}
 	p.searchLocalRoot(ctxt, srcDir)
 	p.genSignature()
 	return nil
