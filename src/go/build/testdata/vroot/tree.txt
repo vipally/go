@@ -1,0 +1,220 @@
+vroot
+©¦ 
+©À©¤gopath1
+©¦  ©¸©¤src
+©¦      ©À©¤local1
+©¦      ©À©¤local2
+©¦      ©À©¤localroot1
+©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¸©¤vendor
+©¦      ©¦          ©À©¤localrootv1
+©¦      ©¦          ©¦  ©¸©¤src
+©¦      ©¦          ©¦      ©À©¤local1
+©¦      ©¦          ©¦      ©À©¤local2
+©¦      ©¦          ©¦      ©À©¤local3
+©¦      ©¦          ©¦      ©¸©¤vendor
+©¦      ©¦          ©¦          ©À©¤localrootv1
+©¦      ©¦          ©¦          ©¦  ©¸©¤src
+©¦      ©¦          ©¦          ©¦      ©À©¤local1
+©¦      ©¦          ©¦          ©¦      ©À©¤local2
+©¦      ©¦          ©¦          ©¦      ©À©¤local3
+©¦      ©¦          ©¦          ©¦      ©¸©¤vendor
+©¦      ©¦          ©¦          ©¦          ©¸©¤vendored
+©¦      ©¦          ©¦          ©¸©¤vendored
+©¦      ©¦          ©¸©¤vendored
+©¦      ©À©¤localroot2
+©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¸©¤vendor
+©¦      ©¦          ©¸©¤vendored
+©¦      ©À©¤noroot1
+©¦      ©¦  ©À©¤local1
+©¦      ©¦  ©À©¤local2
+©¦      ©¦  ©À©¤local3
+©¦      ©¦  ©¸©¤vendor
+©¦      ©¦      ©À©¤localrootv1
+©¦      ©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¦      ©¸©¤vendor
+©¦      ©¦      ©¦          ©¸©¤vendored
+©¦      ©¦      ©¸©¤vendored
+©¦      ©À©¤noroot2
+©¦      ©¦  ©À©¤local1
+©¦      ©¦  ©À©¤local2
+©¦      ©¦  ©À©¤local3
+©¦      ©¦  ©¸©¤vendor
+©¦      ©¦      ©¸©¤vendored
+©¦      ©¸©¤vendor
+©¦          ©¸©¤localrootv1
+©¦              ©¸©¤src
+©¦                  ©À©¤local1
+©¦                  ©À©¤local2
+©¦                  ©À©¤local3
+©¦                  ©¸©¤vendor
+©À©¤gopath2
+©¦  ©¸©¤src
+©¦      ©À©¤local2
+©¦      ©À©¤local3
+©¦      ©À©¤localroot2
+©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¸©¤vendor
+©¦      ©¦          ©¸©¤vendored
+©¦      ©À©¤localroot3
+©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¸©¤vendor
+©¦      ©¦          ©À©¤localrootv1
+©¦      ©¦          ©¦  ©¸©¤src
+©¦      ©¦          ©¦      ©À©¤local1
+©¦      ©¦          ©¦      ©À©¤local2
+©¦      ©¦          ©¦      ©À©¤local3
+©¦      ©¦          ©¦      ©¸©¤vendor
+©¦      ©¦          ©¦          ©À©¤localrootv1
+©¦      ©¦          ©¦          ©¦  ©¸©¤src
+©¦      ©¦          ©¦          ©¦      ©À©¤local1
+©¦      ©¦          ©¦          ©¦      ©À©¤local2
+©¦      ©¦          ©¦          ©¦      ©À©¤local3
+©¦      ©¦          ©¦          ©¦      ©¸©¤vendor
+©¦      ©¦          ©¦          ©¦          ©¸©¤vendored
+©¦      ©¦          ©¦          ©¸©¤vendored
+©¦      ©¦          ©¸©¤vendored
+©¦      ©À©¤noroot1
+©¦      ©¦  ©À©¤local1
+©¦      ©¦  ©À©¤local2
+©¦      ©¦  ©À©¤local3
+©¦      ©¦  ©¸©¤vendor
+©¦      ©¦      ©À©¤localrootv1
+©¦      ©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¦      ©¸©¤vendor
+©¦      ©¦      ©¦          ©¸©¤vendored
+©¦      ©¦      ©¸©¤vendored
+©¦      ©À©¤noroot2
+©¦      ©¦  ©À©¤local1
+©¦      ©¦  ©À©¤local2
+©¦      ©¦  ©À©¤local3
+©¦      ©¦  ©¸©¤vendor
+©¦      ©¦      ©¸©¤vendored
+©¦      ©¸©¤vendor
+©¦          ©¸©¤localrootv1
+©¦              ©¸©¤src
+©¦                  ©À©¤local1
+©¦                  ©À©¤local2
+©¦                  ©À©¤local3
+©¦                  ©¸©¤vendor
+©À©¤gopath3
+©¦  ©¸©¤src
+©¦      ©À©¤localroot3
+©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¸©¤vendor
+©¦      ©¦          ©À©¤localrootv1
+©¦      ©¦          ©¦  ©¸©¤src
+©¦      ©¦          ©¦      ©À©¤local1
+©¦      ©¦          ©¦      ©À©¤local2
+©¦      ©¦          ©¦      ©À©¤local3
+©¦      ©¦          ©¦      ©¸©¤vendor
+©¦      ©¦          ©¦          ©À©¤localrootv1
+©¦      ©¦          ©¦          ©¦  ©¸©¤src
+©¦      ©¦          ©¦          ©¦      ©À©¤local1
+©¦      ©¦          ©¦          ©¦      ©À©¤local2
+©¦      ©¦          ©¦          ©¦      ©À©¤local3
+©¦      ©¦          ©¦          ©¦      ©¸©¤vendor
+©¦      ©¦          ©¦          ©¦          ©¸©¤vendored
+©¦      ©¦          ©¦          ©¸©¤vendored
+©¦      ©¦          ©¸©¤vendored
+©¦      ©À©¤localroot4
+©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¸©¤vendor
+©¦      ©¦          ©¸©¤vendored
+©¦      ©À©¤noroot1
+©¦      ©¦  ©À©¤local1
+©¦      ©¦  ©À©¤local2
+©¦      ©¦  ©À©¤local3
+©¦      ©¦  ©¸©¤vendor
+©¦      ©¦      ©À©¤localrootv1
+©¦      ©¦      ©¦  ©¸©¤src
+©¦      ©¦      ©¦      ©À©¤local1
+©¦      ©¦      ©¦      ©À©¤local2
+©¦      ©¦      ©¦      ©À©¤local3
+©¦      ©¦      ©¦      ©¸©¤vendor
+©¦      ©¦      ©¦          ©¸©¤vendored
+©¦      ©¦      ©¸©¤vendored
+©¦      ©À©¤noroot2
+©¦      ©¦  ©À©¤local1
+©¦      ©¦  ©À©¤local2
+©¦      ©¦  ©À©¤local3
+©¦      ©¦  ©¸©¤vendor
+©¦      ©¦      ©¸©¤vendored
+©¦      ©¸©¤vendor
+©¦          ©¸©¤localrootv1
+©¦              ©¸©¤src
+©¦                  ©À©¤local1
+©¦                  ©À©¤local2
+©¦                  ©À©¤local3
+©¦                  ©¸©¤vendor
+©À©¤localroot1
+©¦  ©¸©¤src
+©¦      ©À©¤local1
+©¦      ©À©¤local2
+©¦      ©À©¤local3
+©¦      ©¸©¤vendor
+©¦          ©À©¤localrootv1
+©¦          ©¦  ©¸©¤src
+©¦          ©¦      ©À©¤local1
+©¦          ©¦      ©À©¤local2
+©¦          ©¦      ©À©¤local3
+©¦          ©¦      ©¸©¤vendor
+©¦          ©¦          ©À©¤localrootv1
+©¦          ©¦          ©¦  ©¸©¤src
+©¦          ©¦          ©¦      ©À©¤local1
+©¦          ©¦          ©¦      ©À©¤local2
+©¦          ©¦          ©¦      ©À©¤local3
+©¦          ©¦          ©¦      ©¸©¤vendor
+©¦          ©¦          ©¦          ©¸©¤vendored
+©¦          ©¦          ©¸©¤vendored
+©¦          ©¸©¤vendored
+©À©¤localroot2
+©¦  ©¸©¤src
+©¦      ©À©¤local1
+©¦      ©À©¤local2
+©¦      ©À©¤local3
+©¦      ©¸©¤vendor
+©¦          ©¸©¤vendored
+©À©¤noroot1
+©¦  ©À©¤local1
+©¦  ©À©¤local2
+©¦  ©À©¤local3
+©¦  ©¸©¤vendor
+©¦      ©¸©¤localrootv1
+©¦          ©¸©¤src
+©¦              ©À©¤local1
+©¦              ©À©¤local2
+©¦              ©À©¤local3
+©¦              ©¸©¤vendor
+©¦                  ©¸©¤vendored
+©¸©¤noroot2
+    ©À©¤local1
+    ©À©¤local2
+    ©À©¤local3
+    ©¸©¤vendor
+        ©¸©¤vendored

@@ -163,7 +163,8 @@ func hasSubdir(root, dir string) (rel string, ok bool) {
 
 	// Fix #22863: main package in GoPath/src/ runs "go install" fail.
 	// see: https://github.com/golang/go/issues/22863
-	if root == dir {
+	// if root is empty, filepath.Clean(root) will returns "."
+	if root == dir && root != "." {
 		return ".", true
 	}
 
