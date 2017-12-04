@@ -114,7 +114,7 @@ func TestFormatImportPath(t *testing.T) {
 		&_Case{".", "__goroot__/src/notexist", fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir(`__goroot__\src\notexist`)), &_Want{}},
 		&_Case{".", "gopath1/src/notexist", fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir("gopath1/src/notexist")), &_Want{}},
 		&_Case{".", "noroot1/testdata/local1", fmt.Errorf(`import "%s": cannot refer package under testdata %s`, ".", vdir(`noroot1\testdata\local1`)), &_Want{}},
-		&_Case{".", "localroot1/src/testdata/local1", fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
+		&_Case{".", "localroot1/src/testdata/local1", fmt.Errorf(`import ".": cannot refer package under testdata v:\localroot1\src\testdata\local1`), &_Want{}},
 
 		&_Case{"#/x/y/z", "notexist", nil, &_Want{ImportPath: "#/x/y/z", Dir: vdir(``), Root: vdir(``), Type: PackageUnknown, Style: ImportStyleLocalRoot, ConflictDir: "", Formated: false}},
 		&_Case{"x/y/z", "notexist", nil, &_Want{ImportPath: "x/y/z", Dir: vdir(``), Root: vdir(``), Type: PackageUnknown, Style: ImportStyleGlobal, ConflictDir: "", Formated: false}},
@@ -165,9 +165,13 @@ func TestFindImport(t *testing.T) {
 		&_Case{".", "notexist", 0, fmt.Errorf(`import "%s": cannot find package at v:\notexist`, "."), &_Want{}},
 		&_Case{".", "__goroot__/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir(`__goroot__\src\notexist`)), &_Want{}},
 		&_Case{".", "gopath1/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir("gopath1/src/notexist")), &_Want{}},
-		&_Case{".", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
+		&_Case{".", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import ".": cannot refer package under testdata v:\localroot1\src\testdata\local1`), &_Want{}},
 		&_Case{"#/testdata/local1", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
 		&_Case{"testdata/local1", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "testdata/local1"), &_Want{}},
+		&_Case{".", "__goroot__/src/go/build/testdata/vroot/noroot1", 0, fmt.Errorf(`import ".": cannot refer package under testdata v:\__goroot__\src\go\build\testdata\vroot\noroot1`), &_Want{}},
+		&_Case{"go/build/testdata/vroot/noroot1", "__goroot__", 0, fmt.Errorf(`import "go/build/testdata/vroot/noroot1": cannot refer package under testdata`), &_Want{}},
+		&_Case{"#/fmt", "__goroot__/src/go", 0, fmt.Errorf(`import "#/fmt": cannot find local-root(with sub-tree "<root>/src/vendor/") up from v:\__goroot__\src\go`), &_Want{}},
+		&_Case{"#/fmt", "localroot1/src/local1", 0, fmt.Errorf(`import "#/fmt": cannot find sub-package under local-root v:\localroot1`), &_Want{}},
 
 		&_Case{"#/xx", "notexist", 0, fmt.Errorf(`import "%s": cannot find local-root(with sub-tree "<root>/src/vendor/") up from %s`, "#/xx", vdir("notexist")), &_Want{}},
 		&_Case{"xx", "notexist", 0, fmt.Errorf("cannot find package %q in any of:\n%s", "xx", strings.Join([]string{

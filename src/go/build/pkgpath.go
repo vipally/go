@@ -104,7 +104,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 		return
 	}
 
-	if style := fi.Style; style.IsRelated() { //import "./../xxx"
+	if fi.Style.IsRelated() { //import "./../xxx"
 		if importerDir == "" {
 			err = fmt.Errorf("import %q: import relative to unknown directory", imported)
 			return
@@ -113,6 +113,11 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			fi.Dir = dir
 			fi.Formated = true
 
+			if inTestdata(filepath.ToSlash(fi.Dir)) {
+				err = fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
+				return
+			}
+
 			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
 				localRootSrc := ctxt.joinPath(localRoot, "src")
 				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
@@ -120,10 +125,10 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 					if sub != "" && sub != "." {
 						importPath = "#/" + sub
 					}
-					if inTestdata(sub) {
-						err = fmt.Errorf("import %q: cannot refer package under testdata", importPath)
-						return
-					}
+					//					if inTestdata(sub) {
+					//						err = fmt.Errorf("import %q: cannot refer package under testdata", importPath)
+					//						return
+					//					}
 					fi.ImportPath = importPath
 					fi.Root = localRoot
 					fi.Type = PackageLocalRoot
@@ -133,11 +138,6 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			}
 
 			if ok := fi.findGlobalRoot(ctxt, fi.Dir); ok {
-				return
-			}
-
-			if inTestdata(filepath.ToSlash(fi.Dir)) {
-				err = fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
 				return
 			}
 
@@ -156,7 +156,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	findRootSrc := ""
 	for _, rootsrc := range gblSrcs {
-		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok && !inTestdata(sub) {
+		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok /*&& !inTestdata(sub)*/ {
 			fi.ImportPath = sub
 			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
 			fi.Style = ImportStyleGlobal
@@ -320,12 +320,12 @@ func GetImportStyle(imported string) (ImportStyle, error) {
 // IsValidImportStatement return if a import path in statement is valid
 // import "./xxx" "../xxx" is not allowed in statement
 func CheckImportStatement(imported string) error {
-	if style, err := GetImportStyle(imported); err == nil {
-		if style.IsRelated() || style.IsSelf() {
-			return fmt.Errorf("import %q: related import not allowed in statement", imported)
-		}
-	} else {
+	style, err := GetImportStyle(imported)
+	if err != nil {
 		return err
+	}
+	if style.IsRelated() || style.IsSelf() {
+		return fmt.Errorf("import %q: related import not allowed in statement", imported)
 	}
 	return nil
 }
