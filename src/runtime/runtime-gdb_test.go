@@ -26,7 +26,7 @@ func checkGdbEnvironment(t *testing.T) {
 	case "darwin":
 		t.Skip("gdb does not work on darwin")
 	case "netbsd":
-		t.Skip("test times out on NetBSD for unknown reasons; issue 22893")
+		t.Skip("gdb does not work with threads on NetBSD; see golang.org/issue/22893 and gnats.netbsd.org/52548")
 	case "linux":
 		if runtime.GOARCH == "ppc64" {
 			t.Skip("skipping gdb tests on linux/ppc64; see golang.org/issue/17366")
@@ -110,8 +110,8 @@ func testGdbPython(t *testing.T, cgo bool) {
 		t.Skip("skipping because cgo is not enabled")
 	}
 
-	t.Parallel()
 	checkGdbEnvironment(t)
+	t.Parallel()
 	checkGdbVersion(t)
 	checkGdbPython(t)
 
@@ -218,7 +218,7 @@ func testGdbPython(t *testing.T, cgo bool) {
 	// a collection of scalar vars holding the fields. In such cases
 	// the DWARF variable location expression should be of the
 	// form "var.field" and not just "field".
-	infoLocalsRe := regexp.MustCompile(`^slicevar.len = `)
+	infoLocalsRe := regexp.MustCompile(`.*\sslicevar.cap = `)
 	if bl := blocks["info locals"]; !infoLocalsRe.MatchString(bl) {
 		t.Fatalf("info locals failed: %s", bl)
 	}
@@ -266,8 +266,8 @@ func TestGdbBacktrace(t *testing.T) {
 		testenv.SkipFlaky(t, 15603)
 	}
 
-	t.Parallel()
 	checkGdbEnvironment(t)
+	t.Parallel()
 	checkGdbVersion(t)
 
 	dir, err := ioutil.TempDir("", "go-build")
@@ -336,8 +336,8 @@ func main() {
 // TestGdbAutotmpTypes ensures that types of autotmp variables appear in .debug_info
 // See bug #17830.
 func TestGdbAutotmpTypes(t *testing.T) {
-	t.Parallel()
 	checkGdbEnvironment(t)
+	t.Parallel()
 	checkGdbVersion(t)
 
 	dir, err := ioutil.TempDir("", "go-build")
@@ -401,8 +401,8 @@ func main() {
 `
 
 func TestGdbConst(t *testing.T) {
-	t.Parallel()
 	checkGdbEnvironment(t)
+	t.Parallel()
 	checkGdbVersion(t)
 
 	dir, err := ioutil.TempDir("", "go-build")

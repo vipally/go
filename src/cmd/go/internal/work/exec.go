@@ -220,7 +220,6 @@ func (b *Builder) buildActionID(a *Action) cache.ActionID {
 		// TODO(rsc): Convince compiler team not to add more magic environment variables,
 		// or perhaps restrict the environment variables passed to subprocesses.
 		magic := []string{
-			"GOEXPERIMENT",
 			"GOCLOBBERDEADHASH",
 			"GOSSAFUNC",
 			"GO_SSA_PHI_LOC_CUTOFF",
@@ -639,6 +638,8 @@ type vetConfig struct {
 	GoFiles     []string
 	ImportMap   map[string]string
 	PackageFile map[string]string
+
+	SucceedOnTypecheckFailure bool
 }
 
 // VetFlags are the flags to pass to vet.
@@ -663,6 +664,13 @@ func (b *Builder) vet(a *Action) error {
 		vcfg.ImportMap["fmt"] = "fmt"
 		vcfg.PackageFile["fmt"] = a1.built
 	}
+
+	// During go test, ignore type-checking failures during vet.
+	// We only run vet if the compilation has succeeded,
+	// so at least for now assume the bug is in vet.
+	// We know of at least #18395.
+	// TODO(rsc,gri): Try to remove this for Go 1.11.
+	vcfg.SucceedOnTypecheckFailure = cfg.CmdName == "test"
 
 	js, err := json.MarshalIndent(vcfg, "", "\t")
 	if err != nil {
@@ -708,7 +716,7 @@ func (b *Builder) linkActionID(a *Action) cache.ActionID {
 				fmt.Fprintf(h, "packagemain %s\n", a1.buildID)
 			}
 			if p1.Shlib != "" {
-				fmt.Fprintf(h, "pakageshlib %s=%s\n", p1.ImportPath, contentID(b.buildID(p1.Shlib)))
+				fmt.Fprintf(h, "packageshlib %s=%s\n", p1.ImportPath, contentID(b.buildID(p1.Shlib)))
 			}
 		}
 	}
@@ -924,7 +932,7 @@ func (b *Builder) linkSharedActionID(a *Action) cache.ActionID {
 		if p1 != nil {
 			fmt.Fprintf(h, "packagefile %s=%s\n", p1.ImportPath, contentID(b.buildID(a1.built)))
 			if p1.Shlib != "" {
-				fmt.Fprintf(h, "pakageshlib %s=%s\n", p1.ImportPath, contentID(b.buildID(p1.Shlib)))
+				fmt.Fprintf(h, "packageshlib %s=%s\n", p1.ImportPath, contentID(b.buildID(p1.Shlib)))
 			}
 		}
 	}

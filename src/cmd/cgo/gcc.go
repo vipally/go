@@ -2227,6 +2227,12 @@ func (c *typeConv) FuncArg(dtype dwarf.Type, pos token.Pos) *Type {
 				break
 			}
 
+			// If we already know the typedef for t just use that.
+			// See issue 19832.
+			if def := typedef[t.Go.(*ast.Ident).Name]; def != nil {
+				break
+			}
+
 			t = c.Type(ptr, pos)
 			if t == nil {
 				return nil
@@ -2382,7 +2388,9 @@ func (c *typeConv) Struct(dt *dwarf.StructType, pos token.Pos) (expr *ast.Struct
 		size := t.Size
 		talign := t.Align
 		if f.BitSize > 0 {
-			if f.BitSize%8 != 0 {
+			switch f.BitSize {
+			case 8, 16, 32, 64:
+			default:
 				continue
 			}
 			size = f.BitSize / 8

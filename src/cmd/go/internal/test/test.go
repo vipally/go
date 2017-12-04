@@ -187,7 +187,7 @@ control the execution of any test:
 const testFlag2 = `
 	-bench regexp
 	    Run only those benchmarks matching a regular expression.
-	    By default, no benchmarks are run. 
+	    By default, no benchmarks are run.
 	    To run all benchmarks, use '-bench .' or '-bench=.'.
 	    The regular expression is split by unbracketed slash (/)
 	    characters into a sequence of regular expressions, and each
@@ -237,6 +237,9 @@ const testFlag2 = `
 	    benchmarks should be executed. The default is the current value
 	    of GOMAXPROCS.
 
+	-failfast
+	    Do not start new tests after the first test failure.
+
 	-list regexp
 	    List tests, benchmarks, or examples matching the regular expression.
 	    No tests, benchmarks or examples will be run. This will only
@@ -269,6 +272,7 @@ const testFlag2 = `
 
 	-timeout d
 	    If a test binary runs longer than duration d, panic.
+	    If d is 0, the timeout is disabled.
 	    The default is 10 minutes (10m).
 
 	-v
@@ -463,6 +467,7 @@ var (
 	testCoverPaths   []string        // -coverpkg flag
 	testCoverPkgs    []*load.Package // -coverpkg flag
 	testCoverProfile string          // -coverprofile flag
+	testOutputDir    string          // -outputdir flag
 	testO            string          // -o flag
 	testProfile      string          // profiling flag that limits test to one package
 	testNeedBinary   bool            // profile needs to keep binary around
@@ -545,6 +550,10 @@ func runTest(cmd *base.Command, args []string) {
 	// timer does not get a chance to fire.
 	if dt, err := time.ParseDuration(testTimeout); err == nil && dt > 0 {
 		testKillTimeout = dt + 1*time.Minute
+	} else if err == nil && dt == 0 {
+		// An explicit zero disables the test timeout.
+		// Let it have one century (almost) before we kill it.
+		testKillTimeout = 100 * 365 * 24 * time.Hour
 	}
 
 	// show passing test output (after buffering) with -v flag.
@@ -661,6 +670,9 @@ func runTest(cmd *base.Command, args []string) {
 			coverFiles = append(coverFiles, p.CgoFiles...)
 			coverFiles = append(coverFiles, p.TestGoFiles...)
 			p.Internal.CoverVars = declareCoverVars(p.ImportPath, coverFiles...)
+			if testCover && testCoverMode == "atomic" {
+				ensureImport(p, "sync/atomic")
+			}
 		}
 	}
 
@@ -888,6 +900,11 @@ func builderTest(b *work.Builder, p *load.Package) (buildAction, runAction, prin
 				},
 				Imports:    ximports,
 				RawImports: rawXTestImports,
+
+				Asmflags:   p.Internal.Asmflags,
+				Gcflags:    p.Internal.Gcflags,
+				Ldflags:    p.Internal.Ldflags,
+				Gccgoflags: p.Internal.Gccgoflags,
 			},
 		}
 		if pxtestNeedsPtest {
@@ -1164,8 +1181,6 @@ func recompileForTest(pmain, preal, ptest *load.Package) {
 	}
 }
 
-var coverIndex = 0
-
 // isTestFile reports whether the source file is a set of tests and should therefore
 // be excluded from coverage analysis.
 func isTestFile(file string) bool {
@@ -1177,6 +1192,7 @@ func isTestFile(file string) bool {
 // to the files, to be used when annotating the files.
 func declareCoverVars(importPath string, files ...string) map[string]*load.CoverVar {
 	coverVars := make(map[string]*load.CoverVar)
+	coverIndex := 0
 	for _, file := range files {
 		if isTestFile(file) {
 			continue
@@ -1234,14 +1250,6 @@ func (c *runCache) builderRunTest(b *work.Builder, a *work.Action) error {
 		return nil
 	}
 
-	args := str.StringList(work.FindExecCmd(), a.Deps[0].Target, testArgs)
-	if cfg.BuildN || cfg.BuildX {
-		b.Showcmd("", "%s", strings.Join(args, " "))
-		if cfg.BuildN {
-			return nil
-		}
-	}
-
 	if a.Failed {
 		// We were unable to build the binary.
 		a.Failed = false
@@ -1251,12 +1259,21 @@ func (c *runCache) builderRunTest(b *work.Builder, a *work.Action) error {
 		return nil
 	}
 
+	args := str.StringList(work.FindExecCmd(), a.Deps[0].Target, testArgs)
+
 	if testCoverProfile != "" {
 		// Write coverage to temporary profile, for merging later.
 		for i, arg := range args {
 			if strings.HasPrefix(arg, "-test.coverprofile=") {
 				args[i] = "-test.coverprofile=" + a.Objdir + "_cover_.out"
 			}
+		}
+	}
+
+	if cfg.BuildN || cfg.BuildX {
+		b.Showcmd("", "%s", strings.Join(args, " "))
+		if cfg.BuildN {
+			return nil
 		}
 	}
 
@@ -1274,7 +1291,7 @@ func (c *runCache) builderRunTest(b *work.Builder, a *work.Action) error {
 		// Stream test output (no buffering) when no package has
 		// been given on the command line (implicit current directory)
 		// or when benchmarking.
-		cmd.Stdout = os.Stdout
+		cmd.Stdout = stdout
 	} else {
 		// If we're only running a single package under test or if parallelism is
 		// set to 1, and if we're displaying all output (testShowPass), we can
@@ -1538,7 +1555,13 @@ func builderPrintTest(b *work.Builder, a *work.Action) error {
 
 // builderNoTest is the action for testing a package with no test files.
 func builderNoTest(b *work.Builder, a *work.Action) error {
-	fmt.Printf("?   \t%s\t[no test files]\n", a.Package.ImportPath)
+	var stdout io.Writer = os.Stdout
+	if testJSON {
+		json := test2json.NewConverter(lockedStdout{}, a.Package.ImportPath, test2json.Timestamp)
+		defer json.Close()
+		stdout = json
+	}
+	fmt.Fprintf(stdout, "?   \t%s\t[no test files]\n", a.Package.ImportPath)
 	return nil
 }
 
