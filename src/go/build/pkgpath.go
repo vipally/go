@@ -52,7 +52,7 @@ var (
 //	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
 	//do not match LocalRoot under GoRoot
-	if _, ok := ctxt.hasSubdir(ctxt.GOROOT, curPath); !ok {
+	if _, ok := ctxt.hasSubdir(ctxt.GOROOT, curPath); ok {
 		return ""
 	}
 
