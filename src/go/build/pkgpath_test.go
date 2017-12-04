@@ -204,6 +204,12 @@ func TestFindImport(t *testing.T) {
 		//		&_Case{".", "gopath1/src/localroot1/src/vendor/localrootv1/src/local1", 0, nil, &_Want{}},
 		//		&_Case{"#/localrootv1/src/local1", "gopath1/src/localroot1/src/local1", 0, nil, &_Want{}},
 		//		&_Case{"localrootv1/src/local1", "gopath1/src/localroot1/src/local1", 0, nil, &_Want{}},
+
+		//		&_Case{"fmt", "gopath1/src/local1", 0, nil, &_Want{}},
+		//		&_Case{"cmd/compile", "noroot1", 0, nil, &_Want{}},
+		//		&_Case{"cmd/compile", "localroot1", 0, nil, &_Want{}},
+		//		&_Case{"cmd/compile", "gopath1/src/local1", 0, nil, &_Want{}},
+		//		&_Case{"cmd/compile", "localroot1/src/local1", 0, nil, &_Want{}},
 	}
 	for i, testCase := range testCases {
 		var pp PackagePath
