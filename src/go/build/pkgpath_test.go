@@ -18,7 +18,7 @@ var (
 	fsRoot      = testContext.joinPath(getwd(), "testdata/vroot")
 	testContext = defaultContext()
 	vroot       = "/" //virtual fs root
-	thidDir     = getwd()
+	thisDir     = getwd()
 	showResult  = false
 )
 
@@ -226,7 +226,7 @@ func full(vdir string) string {
 		return ""
 	}
 	if sub, ok := testContext.hasSubdir(testContext.GOROOT, vdir); ok {
-		return testContext.joinPath(thidDir, "../../..", sub) //real goroot
+		return testContext.joinPath(thisDir, "../../..", sub) //real goroot
 	}
 	return testContext.joinPath(fsRoot, strings.TrimPrefix(vdir, vroot)) //related to fsRoot
 }

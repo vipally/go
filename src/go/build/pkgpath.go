@@ -29,6 +29,7 @@ var (
 var testdataRE = regexp.MustCompile(`(?:^|\\|/)testdata(?:$|\\|/)`)
 
 // match "<root>/src/..." case to find <root>
+// it will match the longest path if more than 1 "/src/" found
 var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
 
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath,
@@ -147,7 +148,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 	return
 }
 
-// findGlobalRoot root form GoRoot/GoPath for fullDir
+// findGlobalRoot find root form GoRoot/GoPath for fullDir
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	findRootSrc := ""
 	for _, rootsrc := range gblSrcs {
