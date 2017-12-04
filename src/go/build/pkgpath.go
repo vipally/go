@@ -209,7 +209,7 @@ func GetLocalRootRelatedImportPath(imported string) string {
 
 // IsLocalRootBasedImport reports whether the import path is
 // a local root related import path, like "#/foo"
-// "#"will be replaced with which contains sub-directory "vendor" up from current package path.
+// "#" will be replaced with which contains sub-directory "vendor" up from current package path.
 func IsLocalRootBasedImport(path string) bool {
 	localStyle := len(path) > 2 && path[:2] == "#/" || path == "#"
 	return localStyle
@@ -441,13 +441,23 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode Im
 		}
 	}
 
+	//	if p.Root != "" {
+	//		p.SrcRoot = ctxt.joinPath(p.Root, "src")
+	//		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
+	//		p.BinDir = ctxt.joinPath(p.Root, "bin")
+	//		if pkga != "" {
+	//			//p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
+	//			//p.PkgObj = ctxt.joinPath(p.Root, pkga)
+	//		}
+	//	}
+	p.searchLocalRoot(ctxt, srcDir)
+	p.genSignature()
 	return nil
 }
 
 // searchGlobalPackage find a global style package "x/y/z" form GoRoot/GoPath
 // p.ImportPath must have been setted
 func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, mode ImportMode) error {
-
 	if inTestdata(imported) {
 		return fmt.Errorf("import %q: cannot refer package under testdata", imported)
 	}
@@ -466,7 +476,6 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 	// Vendor directories get first chance to satisfy import.
 	if mode&IgnoreVendor == 0 && srcDir != "" {
 		searchVendor := func(root string, ptype PackageType) bool {
-
 			sub, ok := ctxt.hasSubdir(root, srcDir)
 			if !ok || !strings.HasPrefix(sub, "src/") || inTestdata(sub) {
 				return false
@@ -506,16 +515,15 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 		//search local vendor first
 		if localRoot := p.searchLocalRoot(ctxt, srcDir); localRoot != "" {
 			if searchVendor(localRoot, PackageLocalRoot) {
-				p.Root = localRoot
-				goto Found
+				return nil
 			}
 		}
 		if searchVendor(ctxt.GOROOT, PackageGoRoot) {
-			goto Found
+			return nil
 		}
 		for _, root := range gopath {
 			if searchVendor(root, PackageGoPath) {
-				goto Found
+				return nil
 			}
 		}
 	}
@@ -531,7 +539,8 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 			p.Dir = dir
 			p.Type = PackageGoRoot
 			p.Root = ctxt.GOROOT
-			goto Found
+			p.IsVendor = false
+			return nil
 		}
 		tried.goroot = dir
 	}
@@ -544,7 +553,8 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 			p.Dir = dir
 			p.Root = root
 			p.Type = PackageGoPath
-			goto Found
+			p.IsVendor = false
+			return nil
 		}
 		tried.gopath = append(tried.gopath, dir)
 	}
@@ -558,52 +568,36 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 			p.Root = localRoot
 			p.Type = PackageLocalRoot
 			p.ImportPath = "#/" + p.ImportPath
-			goto Found
+			p.IsVendor = false
+			return nil
 		}
 		tried.localroot = dir
 	}
 
-	if true {
-		// package was not found
-		var paths []string
-		format := "\t%s (vendor tree)"
-		for _, dir := range tried.vendor {
-			paths = append(paths, fmt.Sprintf(format, dir))
-			format = "\t%s"
-		}
-		if tried.goroot != "" {
-			paths = append(paths, fmt.Sprintf("\t%s (from $GOROOT)", tried.goroot))
-		} else {
-			paths = append(paths, "\t($GOROOT not set)")
-		}
-		format = "\t%s (from $GOPATH)"
-		for _, dir := range tried.gopath {
-			paths = append(paths, fmt.Sprintf(format, dir))
-			format = "\t%s"
-		}
-		if len(tried.gopath) == 0 {
-			paths = append(paths, "\t($GOPATH not set. For more details see: 'go help gopath')")
-		}
-		if tried.localroot != "" {
-			paths = append(paths, fmt.Sprintf("\t%s (from #LocalRoot)", tried.localroot))
-		}
-
-		return fmt.Errorf("cannot find package %q in any of:\n%s", imported, strings.Join(paths, "\n"))
+	// package was not found
+	var paths []string
+	format := "\t%s (vendor tree)"
+	for _, dir := range tried.vendor {
+		paths = append(paths, fmt.Sprintf(format, dir))
+		format = "\t%s"
 	}
-
-Found:
-	//	if p.Root != "" {
-	//		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-	//		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
-	//		p.BinDir = ctxt.joinPath(p.Root, "bin")
-	//		if pkga != "" {
-	//			//p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
-	//			//p.PkgObj = ctxt.joinPath(p.Root, pkga)
-	//		}
-	//	}
-	p.searchLocalRoot(ctxt, srcDir)
-	p.genSignature()
-	return nil
+	if tried.goroot != "" {
+		paths = append(paths, fmt.Sprintf("\t%s (from $GOROOT)", tried.goroot))
+	} else {
+		paths = append(paths, "\t($GOROOT not set)")
+	}
+	format = "\t%s (from $GOPATH)"
+	for _, dir := range tried.gopath {
+		paths = append(paths, fmt.Sprintf(format, dir))
+		format = "\t%s"
+	}
+	if len(tried.gopath) == 0 {
+		paths = append(paths, "\t($GOPATH not set. For more details see: 'go help gopath')")
+	}
+	if tried.localroot != "" {
+		paths = append(paths, fmt.Sprintf("\t%s (from #LocalRoot)", tried.localroot))
+	}
+	return fmt.Errorf("cannot find package %q in any of:\n%s", imported, strings.Join(paths, "\n"))
 }
 
 func (p *PackagePath) searchLocalRoot(ctxt *Context, srcDir string) string {
