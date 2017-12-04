@@ -363,7 +363,7 @@ func (t PackageType) String() string {
 }
 
 // copy PackagePath info to Package object
-func (p *Package) copyFromPackagePath(pp *PackagePath) {
+func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 	p.ImportPath = pp.ImportPath
 	p.Dir = pp.Dir
 	p.LocalRoot = pp.LocalRoot
@@ -373,23 +373,62 @@ func (p *Package) copyFromPackagePath(pp *PackagePath) {
 	//	p.IsVendor = pp.IsVendor
 	//	p.ImportPath = pp.ImportPath
 	//	p.Type = pp.Type
+
+	var pkgtargetroot string
+	var pkga string
+	var pkgerr error
+	suffix := ""
+	if ctxt.InstallSuffix != "" {
+		suffix = "_" + ctxt.InstallSuffix
+	}
+	switch ctxt.Compiler {
+	case "gccgo":
+		pkgtargetroot = "pkg/gccgo_" + ctxt.GOOS + "_" + ctxt.GOARCH + suffix
+	case "gc":
+		pkgtargetroot = "pkg/" + ctxt.GOOS + "_" + ctxt.GOARCH + suffix
+	default:
+		// Save error for end of function.
+		pkgerr = fmt.Errorf("import %q: unknown compiler %q", p.ImportPath, ctxt.Compiler)
+	}
+
+	// stand alone imports have no installed path
+	if !pp.Type.IsStandAlonePackage() {
+		switch ctxt.Compiler {
+		case "gccgo":
+			dir, elem := pathpkg.Split(p.ImportPath)
+			pkga = pkgtargetroot + "/" + dir + "lib" + elem + ".a"
+		case "gc":
+			pkga = pkgtargetroot + "/" + p.ImportPath + ".a"
+		}
+		if pp.Type.IsStandAlonePackage() {
+			pkga = ""
+		}
+	}
+
+	if p.Root != "" {
+		p.SrcRoot = ctxt.joinPath(p.Root, "src")
+		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
+		p.BinDir = ctxt.joinPath(p.Root, "bin")
+		if pkga != "" {
+			p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
+			p.PkgObj = ctxt.joinPath(p.Root, pkga)
+		}
+	}
+
+	return pkgerr
 }
 
 // PackagePath represent path information of a package
 type PackagePath struct {
-	ImportPath  string // Regular original import path like: "x/y/z" "#/x/y/z" "./foo" "../foo" "#" "."
-	Dir         string // Dir of imported package
-	LocalRoot   string // LocalRoot of imported package
-	ConflictDir string // this directory shadows Dir in $GOPATH
-	Root        string // Root of imported package
-	//	SrcRoot     string      // package source root directory ("" if unknown)
-	//	PkgRoot     string      // package install root directory ("" if unknown)
-	//	BinDir      string      // command install directory ("" if unknown)
-
-	Signature string      // Signature of imported package, which is unique for every package Dir
-	IsVendor  bool        // From vendor path
-	Type      PackageType // PackageType of this package
-	Style     ImportStyle // Style of ImportPath
+	ImportPath  string      // Regular original import path like: "x/y/z" "#/x/y/z" "./foo" "../foo" "#" "."
+	Dir         string      // Dir of imported package
+	LocalRoot   string      // LocalRoot of imported package
+	ConflictDir string      // this directory shadows Dir in $GOPATH
+	Root        string      // Root of imported package
+	Signature   string      // Signature of imported package, which is unique for every package Dir
+	IsVendor    bool        // From vendor path
+	Type        PackageType // PackageType of this package
+	Style       ImportStyle // Style of ImportPath
 }
 
 func (p *PackagePath) Init() {
@@ -455,15 +494,6 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode Im
 		}
 	}
 
-	//	if p.Root != "" {
-	//		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-	//		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
-	//		p.BinDir = ctxt.joinPath(p.Root, "bin")
-	//		if pkga != "" {
-	//			//p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
-	//			//p.PkgObj = ctxt.joinPath(p.Root, pkga)
-	//		}
-	//	}
 	p.searchLocalRoot(ctxt, srcDir)
 	p.genSignature()
 	return nil

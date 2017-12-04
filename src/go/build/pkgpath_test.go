@@ -240,6 +240,58 @@ func TestFindImport(t *testing.T) {
 	}
 }
 
+func TestTestdataRE(t *testing.T) {
+	type _Case struct {
+		dir   string
+		match bool
+	}
+	testCases := []*_Case{
+		&_Case{"testData", false},
+		&_Case{"testdata", true},
+		&_Case{"testdata\\", true},
+		&_Case{"testdata/", true},
+		&_Case{"x/testdata", true},
+		&_Case{"x\\testdata", true},
+		&_Case{"x\\testdata\\y", true},
+	}
+	for _, testCase := range testCases {
+		match := testdataRE.MatchString(testCase.dir)
+		if match != testCase.match {
+			t.Errorf("testdataRE.match(\"%s\") fail, want %v got %v", testCase.dir, testCase.match, match)
+		}
+	}
+}
+
+func TestSrcRE(t *testing.T) {
+	type _Case struct {
+		dir  string
+		root string
+	}
+	testCases := []*_Case{
+		&_Case{`/x/Src/y`, ``},
+		&_Case{`/x/srcs/y`, ``},
+		&_Case{`/src/y`, ``},
+		&_Case{`/x/src/y`, `/x`},
+		&_Case{`\x/src\y`, `\x`},
+		&_Case{`\x/src`, `\x`},
+		&_Case{`c:\x\src\y/src\z\`, `c:\x\src\y`},
+		&_Case{`c:\x\src\y\src\z\src`, `c:\x\src\y\src\z`},
+		&_Case{`c:\x\src\y\src\z`, `c:\x\src\y`},
+		&_Case{`c:\x\src\y`, `c:\x`},
+		&_Case{`c:\x`, ``},
+	}
+	for _, testCase := range testCases {
+		got := ""
+		match := srcRE.FindAllStringSubmatch(testCase.dir, 1)
+		if match != nil {
+			got = match[0][1]
+		}
+		if got != testCase.root {
+			t.Errorf("srcRE.match(\"%s\") fail, want %v got %v", testCase.dir, testCase.root, got)
+		}
+	}
+}
+
 func setWd(dir string) {
 	wd = vdir(dir)
 }
@@ -263,4 +315,8 @@ func vdir(related string) string {
 
 func tvdir(s string) string {
 	return "\t" + vdir(s)
+}
+
+func TestEnd(t *testing.T) {
+	Default.RefreshEnv()
 }
