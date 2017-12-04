@@ -36,6 +36,7 @@ var (
 
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath,
 // which is the root of local project.
+// SearchLocalRoot will never match path under GoRoot.
 // Actually, a LocalRoot is a private GoPath that is accessible to sub-packages only.
 // It returns "" if not found.
 // The expected working tree of LocalRoot is:
@@ -50,17 +51,18 @@ var (
 //	    │      ...
 //	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
-	dir := curPath
-	withSrc := ""
-	for {
+	//do not match LocalRoot under GoRoot
+	if _, ok := ctxt.hasSubdir(ctxt.GOROOT, curPath); !ok {
+		return ""
+	}
+
+	for root, rootSrc := filepath.Clean(curPath), ""; ; {
 		// if dir = `c:\root\src\prj\src\main`
-		// match[0 ]= []string{"c:\\root\\src\\prj\\src\\", "c:\\root\\src\\prj"}
-		if match := srcRE.FindAllStringSubmatch(dir, 1); match != nil {
-			withSrc, dir = match[0][0], match[0][1]
-			if _, ok := ctxt.hasSubdir(ctxt.GOROOT, dir); !ok { //do not match LocalRoot under GoRoot
-				if vendor := ctxt.joinPath(withSrc, "vendor"); ctxt.isDir(vendor) {
-					return filepath.Clean(dir)
-				}
+		// match[0]= []string{`c:\root\src\prj\src\`, `c:\root\src\prj`}
+		if match := srcRE.FindAllStringSubmatch(root, 1); match != nil {
+			rootSrc, root = match[0][0], match[0][1]
+			if vendor := ctxt.joinPath(rootSrc, "vendor"); ctxt.isDir(vendor) {
+				return root
 			}
 		} else {
 			break
