@@ -22,15 +22,17 @@ var (
 	gblSrcs   = Default.SrcDirs()                       // GoRoot/src & GoPaths/src
 )
 
-//match "." ".." "./xxx" "../xxx"
-//var relatedRE = regexp.MustCompile(`^\.{1,2}(?:/.+)*?`)
+var (
+	//match "." ".." "./xxx" "../xxx"
+	//relatedRE = regexp.MustCompile(`^\.{1,2}(?:/.+)*?`)
 
-//match "/testdata/" or "\\testdata\\"
-var testdataRE = regexp.MustCompile(`(?:^|\\|/)testdata(?:$|\\|/)`)
+	//match "/testdata/" or "\\testdata\\"
+	testdataRE = regexp.MustCompile(`(?:^|\\|/)testdata(?:$|\\|/)`)
 
-// match "<root>/src/..." case to find <root>
-// it will match the longest path if more than 1 "/src/" found
-var srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
+	// match "<root>/src/..." case to find <root>
+	// it will match the longest path if more than 1 "/src/" found
+	srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
+)
 
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath,
 // which is the root of local project.
