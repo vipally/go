@@ -216,11 +216,13 @@ func IsLocalRootBasedImport(path string) bool {
 type ImportStyle uint8
 
 const (
-	ImportStyleUnknown   ImportStyle = iota
-	ImportStyleSelf                  //import "."
-	ImportStyleRelated               //import "./x/y/z" "../x/y/z"
-	ImportStyleLocalRoot             //import "#/x/y/z" "#"
-	ImportStyleGlobal                //import "x/y/z"
+	ImportStyleUnknown   ImportStyle = iota //unknown, invalid
+	ImportStyleSelf                         //import "."
+	ImportStyleRelated                      //import "./x/y/z" "../x/y/z"
+	ImportStyleLocalRoot                    //import "#/x/y/z" "#"
+	ImportStyleGlobal                       //import "x/y/z"
+
+	_ImportStyleEnd // end of ImportStyle, invalid
 )
 
 func (st ImportStyle) String() string {
@@ -237,7 +239,7 @@ func (st ImportStyle) String() string {
 	return "ImportStyleUnknown"
 }
 
-func (st ImportStyle) IsValid() bool     { return st >= ImportStyleSelf && st <= ImportStyleGlobal }
+func (st ImportStyle) IsValid() bool     { return st > 0 && st < _ImportStyleEnd }
 func (st ImportStyle) IsSelf() bool      { return st == ImportStyleSelf }
 func (st ImportStyle) IsRelated() bool   { return st.IsSelf() || st == ImportStyleRelated }
 func (st ImportStyle) IsLocalRoot() bool { return st == ImportStyleLocalRoot }
@@ -333,9 +335,11 @@ const (
 	PackageGoRoot                        //import "x/y/z" style, find from GoRoot
 	PackageGoPath                        //import "x/y/z" style, find from GoPath
 	PackageStandAlone                    //import "./../xx" style, which is out of LocalRoot/GoRoot/GoPath
+
+	_PackageTypeEnd //end of PackageType, invalid
 )
 
-func (t PackageType) IsValid() bool             { return t >= PackageStandAlone && t <= PackageGoPath }
+func (t PackageType) IsValid() bool             { return t > 0 && t < _PackageTypeEnd }
 func (t PackageType) IsStandAlonePackage() bool { return t == PackageStandAlone }
 func (t PackageType) IsLocalPackage() bool      { return t == PackageLocalRoot }
 func (t PackageType) IsStdPackage() bool        { return t == PackageGoRoot }
