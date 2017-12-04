@@ -7,6 +7,7 @@ package build
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,6 +42,10 @@ func init() {
 			return nil, err // nil interface
 		}
 		return f, nil
+	}
+	testContext.ReadDir = func(vdir string) ([]os.FileInfo, error) {
+		dir := full(vdir)
+		return ioutil.ReadDir(dir)
 	}
 	testContext.GOROOT = vdir("__goroot__")
 	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", vdir("gopath1"), filepath.ListSeparator, vdir("gopath2"), filepath.ListSeparator, vdir("gopath3"))
@@ -192,12 +197,12 @@ func TestFindImport(t *testing.T) {
 			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\xx (from #LocalRoot)`),
 		}, "\n")), &_Want{}},
 
-		&_Case{".", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "#/sole", Dir: vdir(`localroot1\src\sole`), Signature: `_\v_\localroot1\src\sole`, LocalRoot: vdir("localroot1"), Root: vdir("localroot1"), ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"sole", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "#/sole", Dir: vdir(`localroot1\src\sole`), Signature: `_\v_\localroot1\src\sole`, LocalRoot: `v:\localroot1`, Root: `v:\localroot1`, ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
+		&_Case{".", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "sole", Dir: vdir(`localroot1\src\sole`), Signature: `_\v_\localroot1\src\sole`, LocalRoot: vdir("localroot1"), Root: vdir("localroot1"), ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
+		&_Case{"sole", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "sole", Dir: vdir(`localroot1\src\sole`), Signature: `_\v_\localroot1\src\sole`, LocalRoot: `v:\localroot1`, Root: `v:\localroot1`, ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
 
-		//		&_Case{"#/sole", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "#/sole", Dir: `v:\localroot1\src\sole`, Signature: "?", LocalRoot: `v:\localroot1`, Root: `v:\localroot1`, ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		//		&_Case{"vendored", "localroot1/src/sole", 0, nil, &_Want{}},
-		//		&_Case{"#/vendored", "localroot1/src/sole", 0, nil, &_Want{}},
+		&_Case{"#/sole", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "sole", Dir: `v:\localroot1\src\sole`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\sole`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
+		&_Case{"vendored", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "vendor/vendored", Dir: `v:\localroot1\src\vendor\vendored`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\vendor\vendored`, IsVendor: true, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
+		&_Case{"#/vendored", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "vendored", Dir: `v:\localroot1\src\vendor\vendored`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\vendor\vendored`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
 
 		//		&_Case{".", "localroot1/src/localrootv1/src/local1", 0, nil, &_Want{}},
 		//		&_Case{".", "localroot1/src/vendor/localrootv1/src/local1", 0, nil, &_Want{}},
@@ -230,10 +235,10 @@ func TestFindImport(t *testing.T) {
 
 		if !reflect.DeepEqual(&pp, testCase.want) {
 			t.Errorf("FindImport[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &pp)
-		}
-
-		if false {
-			fmt.Printf("%d FindImport(%q, %s)=%+v %v\n", i+1, testCase.imported, dir, pp, err)
+		} else {
+			if showResult {
+				t.Logf("%d FindImport(%q, \"%s\")=%+v err=%v\n", i+1, testCase.imported, dir, pp, err)
+			}
 		}
 	}
 }
