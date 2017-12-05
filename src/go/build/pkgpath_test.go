@@ -159,7 +159,7 @@ func TestFormatImportPath(t *testing.T) {
 					i+1, testCase.imported, testCase.dir,
 					g.OriginImportPath, g.ImporterDir, g.FmtImportPath, g.Dir, g.Root, g.ConflictDir, g.Type, g.Style, g.Formated)
 			}
-		} else {
+		} else { //verify
 			//fmt.Printf("%d FormatImportPath(%q, %s)=%+v %v\n", i+1, testCase.imported, dir, formated, err)
 
 			errEq := reflect.DeepEqual(err, testCase.wantErr)
@@ -173,14 +173,14 @@ func TestFormatImportPath(t *testing.T) {
 				t.Errorf("FormatImportPath[%d %q %s] \n    want [%+v]\n     got [%+v]\n", testCase.id, testCase.imported, dir, testCase.want, &formated)
 			}
 		}
-
 	}
 }
 
-func _TestFindImport(t *testing.T) {
+func TestFindImport(t *testing.T) {
 	type _Want = PackagePath
 
 	type _Case struct {
+		id       int
 		imported string
 		dir      string
 		mode     ImportMode
@@ -188,78 +188,86 @@ func _TestFindImport(t *testing.T) {
 		want     *_Want
 	}
 	testCases := []*_Case{
-		&_Case{"c:/go/src", "noroot1", 0, fmt.Errorf(``), &_Want{}},
-		&_Case{"", "noroot1", 0, fmt.Errorf(`import "%s": invalid import path`, ""), &_Want{}},
-		&_Case{"/x/y/z", "noroot1", 0, fmt.Errorf(`import "%s": cannot import absolute path`, "/x/y/z"), &_Want{}},
-		&_Case{"//x/y/z", "noroot1", 0, fmt.Errorf(`import "%s": cannot import absolute path`, "//x/y/z"), &_Want{}},
-		&_Case{".", "notexist", 0, fmt.Errorf(`import "%s": cannot find package at v:\notexist`, "."), &_Want{}},
-		&_Case{".", "__goroot__/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir(`__goroot__\src\notexist`)), &_Want{}},
-		&_Case{".", "gopath1/src/notexist", 0, fmt.Errorf(`import "%s": cannot find package at %s`, ".", vdir("gopath1/src/notexist")), &_Want{}},
-		&_Case{".", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import ".": cannot refer package under testdata v:\localroot1\src\testdata\local1`), &_Want{}},
-		&_Case{"#/testdata/local1", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "#/testdata/local1"), &_Want{}},
-		&_Case{"testdata/local1", "localroot1/src/testdata/local1", 0, fmt.Errorf(`import "%s": cannot refer package under testdata`, "testdata/local1"), &_Want{}},
-		&_Case{".", "__goroot__/src/go/build/testdata/vroot/noroot1", 0, fmt.Errorf(`import ".": cannot refer package under testdata v:\__goroot__\src\go\build\testdata\vroot\noroot1`), &_Want{}},
-		&_Case{"go/build/testdata/vroot/noroot1", "__goroot__", 0, fmt.Errorf(`import "go/build/testdata/vroot/noroot1": cannot refer package under testdata`), &_Want{}},
-		&_Case{"#/fmt", "__goroot__/src/go", 0, fmt.Errorf(`import "#/fmt": cannot find local-root(with sub-tree "<root>/src/vendor/") up from v:\__goroot__\src\go`), &_Want{}},
-		&_Case{"#/fmt", "localroot1/src/local1", 0, fmt.Errorf(`import "#/fmt": cannot find sub-package under local-root v:\localroot1`), &_Want{}},
-
-		&_Case{"#/xx", "notexist", 0, fmt.Errorf(`import "%s": cannot find local-root(with sub-tree "<root>/src/vendor/") up from %s`, "#/xx", vdir("notexist")), &_Want{}},
-		&_Case{"xx", "notexist", 0, fmt.Errorf("cannot find package %q in any of:\n%s", "xx", strings.Join([]string{
-			tvdir(`__goroot__\src\xx (from $GOROOT)`),
-			tvdir(`gopath1\src\xx (from $GOPATH)`),
-			tvdir(`gopath2\src\xx`),
-			tvdir(`gopath3\src\xx`),
-		}, "\n")), &_Want{}},
-		&_Case{"xx", `gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\local1`, 0, fmt.Errorf("cannot find package %q in any of:\n%s", "xx", strings.Join([]string{
-			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\vendor\xx (vendor tree)`),
-			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\xx`),
-			tvdir(`gopath1\src\localroot1\src\vendor\xx`),
-			tvdir(`gopath1\src\vendor\xx`),
-			tvdir(`__goroot__\src\xx (from $GOROOT)`),
-			tvdir(`gopath1\src\xx (from $GOPATH)`),
-			tvdir(`gopath2\src\xx`),
-			tvdir(`gopath3\src\xx`),
-			tvdir(`gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\xx (from #LocalRoot)`),
-		}, "\n")), &_Want{}},
-
-		&_Case{".", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "sole", Dir: vdir(`localroot1\src\sole`), Signature: `_\v_\localroot1\src\sole`, LocalRoot: vdir("localroot1"), Root: vdir("localroot1"), ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"sole", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "sole", Dir: vdir(`localroot1\src\sole`), Signature: `_\v_\localroot1\src\sole`, LocalRoot: `v:\localroot1`, Root: `v:\localroot1`, ConflictDir: "", IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
-		&_Case{"#/sole", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "sole", Dir: `v:\localroot1\src\sole`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\sole`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"vendored", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "vendor/vendored", Dir: `v:\localroot1\src\vendor\vendored`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\vendor\vendored`, IsVendor: true, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
-		&_Case{"#/vendored", "localroot1/src/sole", 0, nil, &_Want{ImportPath: "vendored", Dir: `v:\localroot1\src\vendor\vendored`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\vendor\vendored`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{".", "localroot1/src/localrootv1/src/local1", 0, nil, &_Want{ImportPath: "local1", Dir: `v:\localroot1\src\localrootv1\src\local1`, LocalRoot: `v:\localroot1\src\localrootv1`, ConflictDir: "", Root: `v:\localroot1\src\localrootv1`, Signature: `_\v_\localroot1\src\localrootv1\src\local1`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{".", "localroot1/src/vendor/localrootv1/src/local1", 0, nil, &_Want{ImportPath: "local1", Dir: `v:\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\localroot1\src\vendor\localrootv1`, ConflictDir: "", Root: `v:\localroot1\src\vendor\localrootv1`, Signature: `_\v_\localroot1\src\vendor\localrootv1\src\local1`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"#/localrootv1/src/local1", "localroot1/src/local1", 0, nil, &_Want{ImportPath: "localrootv1/src/local1", Dir: `v:\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\localroot1`, ConflictDir: "", Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\vendor\localrootv1\src\local1`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"localrootv1/src/local1", "localroot1/src/local1", 0, nil, &_Want{ImportPath: "vendor/localrootv1/src/local1", Dir: `v:\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Signature: `_\v_\localroot1\src\vendor\localrootv1\src\local1`, IsVendor: true, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
-		&_Case{".", "gopath1/src/localroot1/src/localrootv1/src/local1", 0, nil, &_Want{ImportPath: "local1", Dir: `v:\gopath1\src\localroot1\src\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1\src\localrootv1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1\src\localrootv1`, Signature: `_\v_\gopath1\src\localroot1\src\localrootv1\src\local1`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{".", "gopath1/src/localroot1/src/vendor/localrootv1/src/local1", 0, nil, &_Want{ImportPath: "local1", Dir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1\src\vendor\localrootv1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1\src\vendor\localrootv1`, Signature: `_\v_\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"#/localrootv1/src/local1", "gopath1/src/localroot1/src/local1", 0, nil, &_Want{ImportPath: "localrootv1/src/local1", Dir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1`, Signature: `_\v_\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, IsVendor: false, Type: PackageLocalRoot, Style: ImportStyleLocalRoot}},
-		&_Case{"localrootv1/src/local1", "gopath1/src/localroot1/src/local1", 0, nil, &_Want{ImportPath: "vendor/localrootv1/src/local1", Dir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1`, Signature: `_\v_\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, IsVendor: true, Type: PackageLocalRoot, Style: ImportStyleGlobal}},
-		&_Case{"fmt", "gopath1/src/local1", 0, nil, &_Want{ImportPath: "fmt", Dir: `v:\__goroot__\src\fmt`, LocalRoot: `v:\gopath1`, ConflictDir: ``, Root: `v:\__goroot__`, Signature: `fmt`, IsVendor: false, Type: PackageGoRoot, Style: ImportStyleGlobal}},
-		&_Case{"cmd/compile", "noroot1", 0, nil, &_Want{ImportPath: "cmd/compile", Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: ``, ConflictDir: ``, Root: `v:\__goroot__`, Signature: `cmd/compile`, IsVendor: false, Type: PackageGoRoot, Style: ImportStyleGlobal}},
-		&_Case{"cmd/compile", "localroot1", 0, nil, &_Want{ImportPath: "cmd/compile", Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: ``, ConflictDir: ``, Root: `v:\__goroot__`, Signature: `cmd/compile`, IsVendor: false, Type: PackageGoRoot, Style: ImportStyleGlobal}},
-		&_Case{"cmd/compile", "gopath1/src/local1", 0, nil, &_Want{ImportPath: "cmd/compile", Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: `v:\gopath1`, ConflictDir: ``, Root: `v:\__goroot__`, Signature: `cmd/compile`, IsVendor: false, Type: PackageGoRoot, Style: ImportStyleGlobal}},
-		&_Case{"cmd/compile", "localroot1/src/local1", 0, nil, &_Want{ImportPath: "cmd/compile", Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\__goroot__`, Signature: `cmd/compile`, IsVendor: false, Type: PackageGoRoot, Style: ImportStyleGlobal}},
+		&_Case{1, `c:/go/src`, `noroot1`, 0, fmt.Errorf(`import "c:/go/src": invalid character U+003A ':'`), &_Want{}},
+		&_Case{2, ``, `noroot1`, 0, fmt.Errorf(`import "": invalid import path`), &_Want{}},
+		&_Case{3, `/x/y/z`, `noroot1`, 0, fmt.Errorf(`import "/x/y/z": cannot import absolute path`), &_Want{}},
+		&_Case{4, `//x/y/z`, `noroot1`, 0, fmt.Errorf(`import "//x/y/z": cannot import absolute path`), &_Want{}},
+		&_Case{5, `.`, `notexist`, 0, fmt.Errorf(`import ".": cannot find package at v:\notexist`), &_Want{}},
+		&_Case{6, `.`, `__goroot__/src/notexist`, 0, fmt.Errorf(`import ".": cannot find package at v:\__goroot__\src\notexist`), &_Want{}},
+		&_Case{7, `.`, `gopath1/src/notexist`, 0, fmt.Errorf(`import ".": cannot find package at v:\gopath1\src\notexist`), &_Want{}},
+		&_Case{8, `.`, `localroot1/src/testdata/local1`, 0, fmt.Errorf(`import ".": cannot refer package under testdata v:\localroot1\src\testdata\local1`), &_Want{}},
+		&_Case{9, `#/testdata/local1`, `localroot1/src/testdata/local1`, 0, fmt.Errorf(`import "#/testdata/local1": cannot refer package under testdata`), &_Want{}},
+		&_Case{10, `testdata/local1`, `localroot1/src/testdata/local1`, 0, fmt.Errorf(`import "testdata/local1": cannot refer package under testdata`), &_Want{}},
+		&_Case{11, `.`, `__goroot__/src/go/build/testdata/vroot/noroot1`, 0, fmt.Errorf(`import ".": cannot refer package under testdata v:\__goroot__\src\go\build\testdata\vroot\noroot1`), &_Want{}},
+		&_Case{12, `go/build/testdata/vroot/noroot1`, `__goroot__`, 0, fmt.Errorf(`import "go/build/testdata/vroot/noroot1": cannot refer package under testdata`), &_Want{}},
+		&_Case{13, `#/fmt`, `__goroot__/src/go`, 0, fmt.Errorf(`import "#/fmt": cannot find local-root(with sub-tree "<root>/src/vendor/") up from v:\__goroot__\src\go`), &_Want{}},
+		&_Case{14, `#/fmt`, `localroot1/src/local1`, 0, fmt.Errorf(`import "#/fmt": cannot find sub-package under local-root v:\localroot1`), &_Want{}},
+		&_Case{15, `#/xx`, `notexist`, 0, fmt.Errorf(`import "#/xx": cannot find local-root(with sub-tree "<root>/src/vendor/") up from v:\notexist`), &_Want{}},
+		&_Case{16, `xx`, `notexist`, 0, fmt.Errorf(`cannot find package "xx" in any of:
+	v:\__goroot__\src\xx (from $GOROOT)
+	v:\gopath1\src\xx (from $GOPATH)
+	v:\gopath2\src\xx
+	v:\gopath3\src\xx`), &_Want{}},
+		&_Case{17, `xx`, `gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\local1`, 0, fmt.Errorf(`cannot find package "xx" in any of:
+	v:\gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\vendor\xx (vendor tree)
+	v:\gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\xx
+	v:\gopath1\src\localroot1\src\vendor\xx
+	v:\gopath1\src\vendor\xx
+	v:\__goroot__\src\xx (from $GOROOT)
+	v:\gopath1\src\xx (from $GOPATH)
+	v:\gopath2\src\xx
+	v:\gopath3\src\xx
+	v:\gopath1\src\localroot1\src\vendor\localrootv1\src\vendor\localrootv1\src\xx (from #LocalRoot)`), &_Want{}},
+		&_Case{18, `.`, `localroot1/src/sole`, 0, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\localroot1\src\sole`, FmtImportPath: `#/sole`, ImportPath: `sole`, Signature: `_\v_\localroot1\src\sole`, Dir: `v:\localroot1\src\sole`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{19, `sole`, `localroot1/src/sole`, 0, nil, &_Want{OriginImportPath: `sole`, ImporterDir: `v:\localroot1\src\sole`, FmtImportPath: `sole`, ImportPath: `sole`, Signature: `_\v_\localroot1\src\sole`, Dir: `v:\localroot1\src\sole`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleGlobal, IsVendor: false}},
+		&_Case{20, `#/sole`, `localroot1/src/sole`, 0, nil, &_Want{OriginImportPath: `#/sole`, ImporterDir: `v:\localroot1\src\sole`, FmtImportPath: `#/sole`, ImportPath: `sole`, Signature: `_\v_\localroot1\src\sole`, Dir: `v:\localroot1\src\sole`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{21, `vendored`, `localroot1/src/sole`, 0, nil, &_Want{OriginImportPath: `vendored`, ImporterDir: `v:\localroot1\src\sole`, FmtImportPath: `vendored`, ImportPath: `vendor/vendored`, Signature: `_\v_\localroot1\src\vendor\vendored`, Dir: `v:\localroot1\src\vendor\vendored`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleGlobal, IsVendor: true}},
+		&_Case{22, `#/vendored`, `localroot1/src/sole`, 0, nil, &_Want{OriginImportPath: `#/vendored`, ImporterDir: `v:\localroot1\src\sole`, FmtImportPath: `#/vendored`, ImportPath: `vendored`, Signature: `_\v_\localroot1\src\vendor\vendored`, Dir: `v:\localroot1\src\vendor\vendored`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{23, `.`, `localroot1/src/localrootv1/src/local1`, 0, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\localroot1\src\localrootv1\src\local1`, FmtImportPath: `#/local1`, ImportPath: `local1`, Signature: `_\v_\localroot1\src\localrootv1\src\local1`, Dir: `v:\localroot1\src\localrootv1\src\local1`, LocalRoot: `v:\localroot1\src\localrootv1`, ConflictDir: ``, Root: `v:\localroot1\src\localrootv1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{24, `.`, `localroot1/src/vendor/localrootv1/src/local1`, 0, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\localroot1\src\vendor\localrootv1\src\local1`, FmtImportPath: `#/local1`, ImportPath: `local1`, Signature: `_\v_\localroot1\src\vendor\localrootv1\src\local1`, Dir: `v:\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\localroot1\src\vendor\localrootv1`, ConflictDir: ``, Root: `v:\localroot1\src\vendor\localrootv1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{25, `#/localrootv1/src/local1`, `localroot1/src/local1`, 0, nil, &_Want{OriginImportPath: `#/localrootv1/src/local1`, ImporterDir: `v:\localroot1\src\local1`, FmtImportPath: `#/localrootv1/src/local1`, ImportPath: `localrootv1/src/local1`, Signature: `_\v_\localroot1\src\vendor\localrootv1\src\local1`, Dir: `v:\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{26, `localrootv1/src/local1`, `localroot1/src/local1`, 0, nil, &_Want{OriginImportPath: `localrootv1/src/local1`, ImporterDir: `v:\localroot1\src\local1`, FmtImportPath: `localrootv1/src/local1`, ImportPath: `vendor/localrootv1/src/local1`, Signature: `_\v_\localroot1\src\vendor\localrootv1\src\local1`, Dir: `v:\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\localroot1`, Type: PackageLocalRoot, Style: ImportStyleGlobal, IsVendor: true}},
+		&_Case{27, `.`, `gopath1/src/localroot1/src/localrootv1/src/local1`, 0, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\gopath1\src\localroot1\src\localrootv1\src\local1`, FmtImportPath: `#/local1`, ImportPath: `local1`, Signature: `_\v_\gopath1\src\localroot1\src\localrootv1\src\local1`, Dir: `v:\gopath1\src\localroot1\src\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1\src\localrootv1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1\src\localrootv1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{28, `.`, `gopath1/src/localroot1/src/vendor/localrootv1/src/local1`, 0, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, FmtImportPath: `#/local1`, ImportPath: `local1`, Signature: `_\v_\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, Dir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1\src\vendor\localrootv1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1\src\vendor\localrootv1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{29, `#/localrootv1/src/local1`, `gopath1/src/localroot1/src/local1`, 0, nil, &_Want{OriginImportPath: `#/localrootv1/src/local1`, ImporterDir: `v:\gopath1\src\localroot1\src\local1`, FmtImportPath: `#/localrootv1/src/local1`, ImportPath: `localrootv1/src/local1`, Signature: `_\v_\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, Dir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1`, Type: PackageLocalRoot, Style: ImportStyleLocalRoot, IsVendor: false}},
+		&_Case{30, `localrootv1/src/local1`, `gopath1/src/localroot1/src/local1`, 0, nil, &_Want{OriginImportPath: `localrootv1/src/local1`, ImporterDir: `v:\gopath1\src\localroot1\src\local1`, FmtImportPath: `localrootv1/src/local1`, ImportPath: `vendor/localrootv1/src/local1`, Signature: `_\v_\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, Dir: `v:\gopath1\src\localroot1\src\vendor\localrootv1\src\local1`, LocalRoot: `v:\gopath1\src\localroot1`, ConflictDir: ``, Root: `v:\gopath1\src\localroot1`, Type: PackageLocalRoot, Style: ImportStyleGlobal, IsVendor: true}},
+		&_Case{31, `fmt`, `gopath1/src/local1`, 0, nil, &_Want{OriginImportPath: `fmt`, ImporterDir: `v:\gopath1\src\local1`, FmtImportPath: `fmt`, ImportPath: `fmt`, Signature: `fmt`, Dir: `v:\__goroot__\src\fmt`, LocalRoot: `v:\gopath1`, ConflictDir: ``, Root: `v:\__goroot__`, Type: PackageGoRoot, Style: ImportStyleGlobal, IsVendor: false}},
+		&_Case{32, `cmd/compile`, `noroot1`, 0, nil, &_Want{OriginImportPath: `cmd/compile`, ImporterDir: `v:\noroot1`, FmtImportPath: `cmd/compile`, ImportPath: `cmd/compile`, Signature: `cmd/compile`, Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: ``, ConflictDir: ``, Root: `v:\__goroot__`, Type: PackageGoRoot, Style: ImportStyleGlobal, IsVendor: false}},
+		&_Case{33, `cmd/compile`, `localroot1`, 0, nil, &_Want{OriginImportPath: `cmd/compile`, ImporterDir: `v:\localroot1`, FmtImportPath: `cmd/compile`, ImportPath: `cmd/compile`, Signature: `cmd/compile`, Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: ``, ConflictDir: ``, Root: `v:\__goroot__`, Type: PackageGoRoot, Style: ImportStyleGlobal, IsVendor: false}},
+		&_Case{34, `cmd/compile`, `gopath1/src/local1`, 0, nil, &_Want{OriginImportPath: `cmd/compile`, ImporterDir: `v:\gopath1\src\local1`, FmtImportPath: `cmd/compile`, ImportPath: `cmd/compile`, Signature: `cmd/compile`, Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: `v:\gopath1`, ConflictDir: ``, Root: `v:\__goroot__`, Type: PackageGoRoot, Style: ImportStyleGlobal, IsVendor: false}},
+		&_Case{35, `cmd/compile`, `localroot1/src/local1`, 0, nil, &_Want{OriginImportPath: `cmd/compile`, ImporterDir: `v:\localroot1\src\local1`, FmtImportPath: `cmd/compile`, ImportPath: `cmd/compile`, Signature: `cmd/compile`, Dir: `v:\__goroot__\src\cmd\compile`, LocalRoot: `v:\localroot1`, ConflictDir: ``, Root: `v:\__goroot__`, Type: PackageGoRoot, Style: ImportStyleGlobal, IsVendor: false}},
 	}
 	for i, testCase := range testCases {
 		var pp PackagePath
 		dir := vdir(testCase.dir)
 		err := pp.FindImport(&testContext, testCase.imported, dir, testCase.mode)
 
-		errEq := reflect.DeepEqual(err, testCase.wantErr)
-		if testCase.wantErr != nil || !errEq {
-			if !errEq {
-				t.Errorf("FindImport [%d %q %s] wantErr=[%+v] gotErr: [%+v] \n[%+v]", i+1, testCase.imported, dir, testCase.wantErr, err, &pp)
+		if false { //genCase
+			if err != nil {
+				fmt.Printf("&_Case{%d, `%s`, `%s`, %d, fmt.Errorf(`%s`),&_Want{}},\n", i+1, testCase.imported, testCase.dir, testCase.mode, err.Error())
+			} else {
+				//fmt.Printf("%+v\n", pp)
+				g := &pp
+				fmt.Printf("&_Case{%d, `%s`, `%s`, %d, nil, &_Want{OriginImportPath:`%s`, ImporterDir:`%s`, FmtImportPath:`%s`, ImportPath:`%s`, Signature:`%s`, Dir:`%s`, LocalRoot:`%s`, ConflictDir:`%s`, Root:`%s`, Type:%s, Style:%s, IsVendor:%v}},\n",
+					i+1, testCase.imported, testCase.dir, testCase.mode,
+					g.OriginImportPath, g.ImporterDir, g.FmtImportPath, g.ImportPath, g.Signature, g.Dir, g.LocalRoot, g.ConflictDir, g.Root, g.Type, g.Style, g.IsVendor)
 			}
-			continue
-		}
+		} else { //verify
+			errEq := reflect.DeepEqual(err, testCase.wantErr)
+			if testCase.wantErr != nil || !errEq {
+				if !errEq {
+					t.Errorf("FindImport [%d %q %s] wantErr=[%+v] gotErr: [%+v] \n[%+v]", i+1, testCase.imported, dir, testCase.wantErr, err, &pp)
+				}
+				continue
+			}
 
-		if !reflect.DeepEqual(&pp, testCase.want) {
-			//fmt.Printf("ImportPath:\"%s\", Dir:`%s`, LocalRoot:`%s` ,ConflictDir:`%s`,Root:`%s`, Signature:`%s`, IsVendor:%v, Type:%v, Style:%v\n", pp.ImportPath, pp.Dir, pp.LocalRoot, pp.ConflictDir, pp.Root, pp.Signature, pp.IsVendor, pp.Type, pp.Style)
-			t.Errorf("FindImport[%d %q %s] \n    want [%+v]\n     got [%+v]\n", i+1, testCase.imported, dir, testCase.want, &pp)
-		} else {
-			if showResult {
-				t.Logf("%d FindImport(%q, \"%s\")=%+v err=%v\n", i+1, testCase.imported, dir, pp, err)
+			if !reflect.DeepEqual(&pp, testCase.want) {
+				//fmt.Printf("ImportPath:\"%s\", Dir:`%s`, LocalRoot:`%s` ,ConflictDir:`%s`,Root:`%s`, Signature:`%s`, IsVendor:%v, Type:%v, Style:%v\n", pp.ImportPath, pp.Dir, pp.LocalRoot, pp.ConflictDir, pp.Root, pp.Signature, pp.IsVendor, pp.Type, pp.Style)
+				t.Errorf("FindImport[%d %q %s] \n    want [%+v]\n     got [%+v]\n", testCase.id, testCase.imported, dir, testCase.want, &pp)
+			} else {
+				if showResult {
+					t.Logf("%d FindImport(%q, \"%s\")=%+v err=%v\n", testCase.id, testCase.imported, dir, pp, err)
+				}
 			}
 		}
 	}
