@@ -34,6 +34,10 @@ type fmtFlags struct {
 	// different, flagless formats set at the top level.
 	plusV  bool
 	sharpV bool
+
+	// use "%##v" to print a value as Go syntax with multi-line style
+	sharpsharp  bool //"##"
+	sharpsharpV bool //"##v"
 }
 
 // A fmt is the raw formatter used by Printf etc.
@@ -409,7 +413,7 @@ func (f *fmt) fmt_bx(b []byte, digits string) {
 // if the string does not contain any control characters other than tab.
 func (f *fmt) fmt_q(s string) {
 	s = f.truncate(s)
-	if f.sharp && strconv.CanBackquote(s) {
+	if f.sharpV || f.sharp && strconv.CanBackquote(s) {
 		f.padString("`" + s + "`")
 		return
 	}

@@ -30,6 +30,8 @@ const (
 	badPrecString     = "%!(BADPREC)"
 	noVerbString      = "%!(NOVERB)"
 	invReflectString  = "<invalid reflect.Value>"
+
+	maxArrayElemInLine = 10 //in "%##v" format, while array too long, put a new line
 )
 
 // State represents the printer state passed to custom formatters.
@@ -608,6 +610,30 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 	return false
 }
 
+// format a new line, "%##v" only
+func (p *pp) newLine(depth int) {
+	if p.fmt.sharpsharpV { //"%##v" only
+		p.buf.WriteByte('\n')
+		for i := 0; i < depth; i++ {
+			p.buf.WriteString("    ")
+		}
+	}
+}
+
+// check if an array format need a new line
+func (p *pp) newLineInArray(elemKind reflect.Kind, index, size int) bool {
+	switch elemKind {
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
+		reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
+		return true
+	default:
+		if index == 0 && size >= maxArrayElemInLine || index > 0 && index%maxArrayElemInLine == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *pp) printArg(arg interface{}, verb rune) {
 	p.arg = arg
 	p.value = reflect.Value{}
@@ -744,19 +770,20 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.buf.WriteString(mapString)
 		}
 		keys := f.MapKeys()
-		for i, key := range keys {
-			if i > 0 {
-				if p.fmt.sharpV {
-					p.buf.WriteString(commaSpaceString)
-				} else {
-					p.buf.WriteByte(' ')
-				}
-			}
+		for _, key := range keys {
+			p.newLine(depth + 1)
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
+			p.buf.WriteByte(' ')
 			p.printValue(f.MapIndex(key), verb, depth+1)
+			if p.fmt.sharpV {
+				p.buf.WriteString(commaSpaceString)
+			} else {
+				p.buf.WriteByte(' ')
+			}
 		}
 		if p.fmt.sharpV {
+			p.newLine(depth)
 			p.buf.WriteByte('}')
 		} else {
 			p.buf.WriteByte(']')
@@ -767,21 +794,22 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 		}
 		p.buf.WriteByte('{')
 		for i := 0; i < f.NumField(); i++ {
-			if i > 0 {
-				if p.fmt.sharpV {
-					p.buf.WriteString(commaSpaceString)
-				} else {
-					p.buf.WriteByte(' ')
-				}
-			}
+			p.newLine(depth + 1)
 			if p.fmt.plusV || p.fmt.sharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
+					p.buf.WriteByte(' ')
 				}
 			}
 			p.printValue(getField(f, i), verb, depth+1)
+			if p.fmt.sharpV {
+				p.buf.WriteString(commaSpaceString)
+			} else {
+				p.buf.WriteByte(' ')
+			}
 		}
+		p.newLine(depth)
 		p.buf.WriteByte('}')
 	case reflect.Interface:
 		value := f.Elem()
@@ -826,11 +854,18 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				return
 			}
 			p.buf.WriteByte('{')
-			for i := 0; i < f.Len(); i++ {
-				if i > 0 {
-					p.buf.WriteString(commaSpaceString)
+			lines := 0
+			elemKind := f.Type().Elem().Kind()
+			for i, size := 0, f.Len(); i < size; i++ {
+				if p.newLineInArray(elemKind, i, size) {
+					lines++
+					p.newLine(depth + 1)
 				}
 				p.printValue(f.Index(i), verb, depth+1)
+				p.buf.WriteString(commaSpaceString)
+			}
+			if lines > 0 {
+				p.newLine(depth)
 			}
 			p.buf.WriteByte('}')
 		} else {
@@ -978,6 +1013,10 @@ formatLoop:
 			c := format[i]
 			switch c {
 			case '#':
+				if p.fmt.sharp { // "##" found
+					println("sharpsharp")
+					p.fmt.sharpsharp = true
+				}
 				p.fmt.sharp = true
 			case '0':
 				p.fmt.zero = !p.fmt.minus // Only allow zero padding to the left.
@@ -996,6 +1035,11 @@ formatLoop:
 						// Go syntax
 						p.fmt.sharpV = p.fmt.sharp
 						p.fmt.sharp = false
+
+						// Go syntax with multi-line format
+						p.fmt.sharpsharpV = p.fmt.sharpsharp
+						p.fmt.sharpsharp = false
+
 						// Struct-field syntax
 						p.fmt.plusV = p.fmt.plus
 						p.fmt.plus = false
@@ -1091,6 +1135,11 @@ formatLoop:
 			// Go syntax
 			p.fmt.sharpV = p.fmt.sharp
 			p.fmt.sharp = false
+
+			// Go syntax with multi-line format
+			p.fmt.sharpsharpV = p.fmt.sharpsharp
+			p.fmt.sharpsharp = false
+
 			// Struct-field syntax
 			p.fmt.plusV = p.fmt.plus
 			p.fmt.plus = false
