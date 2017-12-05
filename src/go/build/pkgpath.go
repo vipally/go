@@ -51,9 +51,14 @@ var (
 //	    │      ...
 //	    └─...
 func (ctxt *Context) SearchLocalRoot(curPath string) string {
+	root, _ := ctxt.searchLocalRoot(curPath)
+	return root
+}
+
+func (ctxt *Context) searchLocalRoot(curPath string) (root, src string) {
 	//do not match LocalRoot under GoRoot
 	if _, ok := ctxt.hasSubdir(ctxt.GOROOT, curPath); ok {
-		return ""
+		return
 	}
 
 	for root, rootSrc := filepath.Clean(curPath), ""; ; {
@@ -62,13 +67,13 @@ func (ctxt *Context) SearchLocalRoot(curPath string) string {
 		if match := srcRE.FindAllStringSubmatch(root, 1); match != nil {
 			rootSrc, root = match[0][0], match[0][1]
 			if vendor := ctxt.joinPath(rootSrc, "vendor"); ctxt.isDir(vendor) {
-				return root
+				return root, rootSrc
 			}
 		} else {
 			break
 		}
 	}
-	return ""
+	return
 }
 
 // RefreshEnv refresh the global vars based on build context
@@ -86,18 +91,50 @@ func (ctxt *Context) FormatImportPath(imported, importerDir string) (formated Fo
 
 // FormatImport is formated import infomation, which prefers "#/foo" "x/y/z" to "./x/y/z" if possible.
 type FormatImport struct {
-	ImportPath  string      // formated import path,prefer "#/foo" "x/y/z" to "./x/y/z" if possible
-	Dir         string      // full directory of imported package
-	Root        string      // Root of imported package
-	Type        PackageType // Type of imported package
-	Style       ImportStyle // Style of ImportPath
-	ConflictDir string      // this directory shadows Dir in $GOPATH
-	Formated    bool        // ImportPath has changed from origin, maybe from "./../foo" to "#/foo" "x/y/z/foo".
+	OriginImportPath string      // original import path. like: "." "./../xx" "#/xx" "xx"
+	ImporterDir      string      // dir of importer
+	FmtImportPath    string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
+	Dir              string      // full directory of imported package
+	Root             string      // Root of imported package
+	ConflictDir      string      // this directory shadows Dir in $GOPATH/$GoPath
+	Type             PackageType // Type of formated ImportPath
+	Style            ImportStyle // Style of formated ImportPath
+	Formated         bool        // FmtImportPath has changed from OriginImportPath, maybe from "./../foo" to "#/foo" "x/y/z/foo".
+}
+
+// PackagePath represent path information of a package
+type PackagePath struct {
+	OriginImportPath string      // original import path. like: "." "./../xx" "#/xx" "xx"
+	ImporterDir      string      // dir of importer
+	FmtImportPath    string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
+	ImportPath       string      // Regular import path related to Root, full path like "c:\x\y\z" for standalone packages
+	Signature        string      // Signature of imported package, which is unique for every package Dir
+	Dir              string      // Dir of imported package
+	LocalRoot        string      // LocalRoot of imported package
+	ConflictDir      string      // this directory shadows Dir in $GOPATH/$GoPath
+	Root             string      // Root of imported package
+	Type             PackageType // Type of formated ImportPath
+	Style            ImportStyle // Style of formated ImportPath
+	IsVendor         bool        // From vendor path
+}
+
+func (fi *FormatImport) Init() {
+	fi.OriginImportPath = ""
+	fi.FmtImportPath = ""
+	fi.ImporterDir = ""
+	fi.Dir = ""
+	fi.Root = ""
+	fi.ConflictDir = ""
+	fi.Style = ImportStyleUnknown
+	fi.Type = PackageUnknown
+	fi.Formated = false
 }
 
 // FormatImportPath convert "." "./x/y/z" "../x/y/z" style import path to "#/x/y/z" "x/y/z" style if possible.
 func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir string) (err error) {
-	fi.ImportPath = imported
+	fi.OriginImportPath = imported
+	fi.ImporterDir = importerDir
+	fi.FmtImportPath = imported
 	fi.Type = PackageUnknown
 
 	if fi.Style, err = GetImportStyle(imported); err != nil {
@@ -113,13 +150,13 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			fi.Dir = dir
 			fi.Formated = true
 
-			if inTestdata(filepath.ToSlash(fi.Dir)) {
+			if inTestdata(fi.Dir) {
 				err = fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
 				return
 			}
 
-			if localRoot := ctxt.SearchLocalRoot(dir); localRoot != "" { //from local root
-				localRootSrc := ctxt.joinPath(localRoot, "src")
+			if localRoot, localRootSrc := ctxt.searchLocalRoot(dir); localRoot != "" { //from local root
+				//localRootSrc := ctxt.joinPath(localRoot, "src")
 				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
 					importPath := "#"
 					if sub != "" && sub != "." {
@@ -129,7 +166,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 					//						err = fmt.Errorf("import %q: cannot refer package under testdata", importPath)
 					//						return
 					//					}
-					fi.ImportPath = importPath
+					fi.FmtImportPath = importPath
 					fi.Root = localRoot
 					fi.Type = PackageLocalRoot
 					fi.Style = ImportStyleLocalRoot
@@ -142,10 +179,15 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			}
 
 			//StandAlone package out of LocalPath/GoRoot/GoPath
-			fi.ImportPath = ""
+			fi.FmtImportPath = fi.Dir
 			fi.Type = PackageStandAlone
 		} else {
 			err = fmt.Errorf("import %q: cannot find package at %s", imported, dir)
+			return
+		}
+	} else {
+		if inTestdata(fi.FmtImportPath) {
+			err = fmt.Errorf("import %q: cannot refer package under testdata", fi.FmtImportPath)
 			return
 		}
 	}
@@ -157,7 +199,7 @@ func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	findRootSrc := ""
 	for _, rootsrc := range gblSrcs {
 		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok /*&& !inTestdata(sub)*/ {
-			fi.ImportPath = sub
+			fi.FmtImportPath = sub
 			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
 			fi.Style = ImportStyleGlobal
 			if rootsrc == goRootSrc {
@@ -174,7 +216,7 @@ func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	if found { //check if conflict
 		for _, rootsrc := range gblSrcs {
 			if rootsrc != findRootSrc {
-				if dir := ctxt.joinPath(rootsrc, fi.ImportPath); ctxt.isDir(dir) {
+				if dir := ctxt.joinPath(rootsrc, fi.FmtImportPath); ctxt.isDir(dir) {
 					fi.ConflictDir = dir
 					break
 				}
@@ -391,7 +433,7 @@ func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 		pkgerr = fmt.Errorf("import %q: unknown compiler %q", p.ImportPath, ctxt.Compiler)
 	}
 
-	// stand alone imports have no installed path
+	// standalone imports have no installed path
 	if !pp.Type.IsStandAlonePackage() {
 		switch ctxt.Compiler {
 		case "gccgo":
@@ -399,9 +441,6 @@ func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 			pkga = pkgtargetroot + "/" + dir + "lib" + elem + ".a"
 		case "gc":
 			pkga = pkgtargetroot + "/" + p.ImportPath + ".a"
-		}
-		if pp.Type.IsStandAlonePackage() {
-			pkga = ""
 		}
 	}
 
@@ -416,19 +455,6 @@ func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 	}
 
 	return pkgerr
-}
-
-// PackagePath represent path information of a package
-type PackagePath struct {
-	ImportPath  string      // Regular original import path like: "x/y/z" "#/x/y/z" "./foo" "../foo" "#" "."
-	Dir         string      // Dir of imported package
-	LocalRoot   string      // LocalRoot of imported package
-	ConflictDir string      // this directory shadows Dir in $GOPATH
-	Root        string      // Root of imported package
-	Signature   string      // Signature of imported package, which is unique for every package Dir
-	IsVendor    bool        // From vendor path
-	Type        PackageType // PackageType of this package
-	Style       ImportStyle // Style of ImportPath
 }
 
 func (p *PackagePath) Init() {
@@ -448,11 +474,14 @@ func (p *PackagePath) FindImportFromWd(ctxt *Context, imported string, mode Impo
 }
 
 func (p *PackagePath) copyFromFormatImport(fmted *FormatImport) {
+	p.Style = fmted.Style
 	p.Type = fmted.Type
 	p.Root = fmted.Root
-	p.ImportPath = fmted.Style.RealImportPath(fmted.ImportPath)
+	p.OriginImportPath = fmted.OriginImportPath
+	p.ImporterDir = fmted.ImporterDir
+	p.FmtImportPath = fmted.FmtImportPath
 	p.Dir = fmted.Dir
-	p.Style = fmted.Style
+	p.ImportPath = p.Style.RealImportPath(p.FmtImportPath)
 }
 
 func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode ImportMode) error {
@@ -521,15 +550,15 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 	if mode&IgnoreVendor == 0 && srcDir != "" {
 		//search local vendor first
 		if localRoot := p.searchLocalRoot(ctxt, srcDir); localRoot != "" {
-			if p.searchVendor(ctxt, imported, srcDir, localRoot, PackageLocalRoot, &tried.vendor) {
+			if p.findFromVendor(ctxt, imported, srcDir, localRoot, PackageLocalRoot, &tried.vendor) {
 				return nil
 			}
 		}
-		if p.searchVendor(ctxt, imported, srcDir, ctxt.GOROOT, PackageGoRoot, &tried.vendor) {
+		if p.findFromVendor(ctxt, imported, srcDir, ctxt.GOROOT, PackageGoRoot, &tried.vendor) {
 			return nil
 		}
 		for _, root := range gopath {
-			if p.searchVendor(ctxt, imported, srcDir, root, PackageGoPath, &tried.vendor) {
+			if p.findFromVendor(ctxt, imported, srcDir, root, PackageGoPath, &tried.vendor) {
 				return nil
 			}
 		}
@@ -614,7 +643,7 @@ func (p *PackagePath) searchLocalRoot(ctxt *Context, srcDir string) string {
 }
 
 //try to find matched vendor under root
-func (p *PackagePath) searchVendor(ctxt *Context, imported, srcDir, root string,
+func (p *PackagePath) findFromVendor(ctxt *Context, imported, srcDir, root string,
 	ptype PackageType, triedvendor *[]string) bool {
 	sub, ok := ctxt.hasSubdir(root, srcDir)
 	if !ok || !strings.HasPrefix(sub, "src/") || inTestdata(sub) {
