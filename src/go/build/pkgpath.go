@@ -143,16 +143,14 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 
 	if fi.Style.IsRelated() { //import "./../xxx"
 		if importerDir == "" {
-			err = fmt.Errorf("import %q: import relative to unknown directory", imported)
-			return
+			return fmt.Errorf("import %q: import relative to unknown directory", imported)
 		}
 		if dir := ctxt.joinPath(importerDir, imported); ctxt.isDir(dir) {
 			fi.Dir = dir
 			fi.Formated = true
 
 			if inTestdata(fi.Dir) {
-				err = fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
-				return
+				return fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
 			}
 
 			if localRoot, localRootSrc := ctxt.searchLocalRoot(dir); localRoot != "" { //from local root
@@ -182,13 +180,11 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			fi.FmtImportPath = fi.Dir
 			fi.Type = PackageStandAlone
 		} else {
-			err = fmt.Errorf("import %q: cannot find package at %s", imported, dir)
-			return
+			return fmt.Errorf("import %q: cannot find package at %s", imported, dir)
 		}
 	} else {
 		if inTestdata(fi.FmtImportPath) {
-			err = fmt.Errorf("import %q: cannot refer package under testdata", fi.FmtImportPath)
-			return
+			return fmt.Errorf("import %q: cannot refer package under testdata", fi.FmtImportPath)
 		}
 	}
 	return
@@ -317,19 +313,9 @@ func (st ImportStyle) FullImportPath(imported, root string) string {
 }
 
 func GetImportStyle(imported string) (ImportStyle, error) {
-	if imported == "" {
-		return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
+	if err := ValidateImportPath(imported); err != nil {
+		return ImportStyleUnknown, err
 	}
-	if imported[0] == '/' {
-		return ImportStyleUnknown, fmt.Errorf("import %q: cannot import absolute path", imported)
-	}
-
-	// syntax check is not required here
-	//
-	// parser.IsValidImport(".") will return false which is not expected
-	//	if imported != "." && !parser.IsValidImport(imported) {
-	//		return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
-	//	}
 
 	switch lead := imported[0]; {
 	case lead == '.':
@@ -770,3 +756,69 @@ func inTestdata(sub string) bool {
 //	}
 //	return s, nil
 //}
+
+// IsValidImportPath return if a import path is valid, which returns bool
+func IsValidImportPath(imported string) bool {
+	if imported == "" || imported[0] == '/' {
+		return false
+	}
+
+	sCheck := imported
+	for len(sCheck) > 0 && sCheck[0] == '.' { //remove prefix "."
+		sCheck = sCheck[1:]
+	}
+
+	// ".../xxx" ".//xxx" is invalid
+	// "." ".." is valid
+	if len(imported) > len(sCheck)+2 || len(sCheck) > 0 && pathpkg.Clean(sCheck) != sCheck {
+		return false
+	}
+
+	//import "#" "#/foo" is valid style
+	if len(imported) == len(sCheck) && len(sCheck) > 0 && sCheck[0] == '#' {
+		sCheck = sCheck[1:]
+	}
+
+	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+	for _, r := range sCheck {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidateImportPath return if a import path is valid, which returns error
+func ValidateImportPath(imported string) error {
+	if imported == "" {
+		return fmt.Errorf("import %q: invalid import path", imported)
+	}
+	if imported[0] == '/' {
+		return fmt.Errorf("import %q: cannot import absolute path", imported)
+	}
+
+	sCheck := imported
+	for len(sCheck) > 0 && sCheck[0] == '.' { //remove prefix "."
+		sCheck = sCheck[1:]
+	}
+
+	// ".../xxx" ".//xxx" is invalid
+	// "." ".." is valid
+	if len(imported) > len(sCheck)+2 || len(sCheck) > 0 && pathpkg.Clean(sCheck) != sCheck {
+		return fmt.Errorf("import %q: invalid import path", imported)
+	}
+
+	//import "#" "#/foo" is valid style
+	if len(imported) == len(sCheck) && len(sCheck) > 0 && sCheck[0] == '#' {
+		sCheck = sCheck[1:]
+	}
+
+	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+	for _, r := range sCheck {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+			return fmt.Errorf("import %q: invalid character %#U", imported, r)
+		}
+	}
+
+	return nil
+}
