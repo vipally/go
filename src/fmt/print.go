@@ -76,6 +76,13 @@ type GoStringer interface {
 // Use simple []byte instead of bytes.Buffer to avoid large dependency.
 type buffer []byte
 
+// TruncateTail remove the last n bytes from buffer.
+func (b *buffer) TruncateTail(n int) {
+	if size := len(*b); size >= n {
+		*b = (*b)[:size-n]
+	}
+}
+
 func (b *buffer) Write(p []byte) {
 	*b = append(*b, p...)
 }
@@ -774,7 +781,9 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.newLine(depth + 1)
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
-			p.buf.WriteByte(' ')
+			if p.fmt.sharpV { //Go syntax
+				p.buf.WriteByte(' ')
+			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
 			if p.fmt.sharpV {
 				p.buf.WriteString(commaSpaceString)
@@ -783,9 +792,15 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			}
 		}
 		if p.fmt.sharpV {
+			if !p.fmt.sharpsharpV && len(keys) > 0 {
+				p.buf.TruncateTail(2) //remove last commaSpaceString
+			}
 			p.newLine(depth)
 			p.buf.WriteByte('}')
 		} else {
+			if len(keys) > 0 {
+				p.buf.TruncateTail(1) //remove last ' '
+			}
 			p.buf.WriteByte(']')
 		}
 	case reflect.Struct:
@@ -793,13 +808,16 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.buf.WriteString(f.Type().String())
 		}
 		p.buf.WriteByte('{')
-		for i := 0; i < f.NumField(); i++ {
+		numField := f.NumField()
+		for i := 0; i < numField; i++ {
 			p.newLine(depth + 1)
 			if p.fmt.plusV || p.fmt.sharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
-					p.buf.WriteByte(' ')
+					if p.fmt.sharpV { //Go syntax
+						p.buf.WriteByte(' ')
+					}
 				}
 			}
 			p.printValue(getField(f, i), verb, depth+1)
@@ -807,6 +825,13 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				p.buf.WriteString(commaSpaceString)
 			} else {
 				p.buf.WriteByte(' ')
+			}
+		}
+		if !p.fmt.sharpsharpV && numField > 0 {
+			if p.fmt.sharpV {
+				p.buf.TruncateTail(2) //remove last commaSpaceString
+			} else {
+				p.buf.TruncateTail(1) //remove last ' '
 			}
 		}
 		p.newLine(depth)
@@ -856,13 +881,17 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.buf.WriteByte('{')
 			lines := 0
 			elemKind := f.Type().Elem().Kind()
-			for i, size := 0, f.Len(); i < size; i++ {
+			size := f.Len()
+			for i := 0; i < size; i++ {
 				if p.newLineInArray(elemKind, i, size) {
 					lines++
 					p.newLine(depth + 1)
 				}
 				p.printValue(f.Index(i), verb, depth+1)
 				p.buf.WriteString(commaSpaceString)
+			}
+			if !p.fmt.sharpsharpV && size > 0 {
+				p.buf.TruncateTail(2) //remove last commaSpaceString
 			}
 			if lines > 0 {
 				p.newLine(depth)

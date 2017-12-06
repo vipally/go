@@ -413,7 +413,7 @@ func (f *fmt) fmt_bx(b []byte, digits string) {
 // if the string does not contain any control characters other than tab.
 func (f *fmt) fmt_q(s string) {
 	s = f.truncate(s)
-	if f.sharpV || f.sharp && strconv.CanBackquote(s) {
+	if (f.sharpsharpV || f.sharpV || f.sharp) && strconv.CanBackquote(s) {
 		f.padString("`" + s + "`")
 		return
 	}
