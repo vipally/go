@@ -806,6 +806,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			if len(keys) > 0 {
 				p.buf.TruncateTail(1) //remove last ' '
 			}
+			p.newLine(depth)
 			p.buf.WriteByte(']')
 		}
 	case reflect.Struct:
