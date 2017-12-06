@@ -617,30 +617,6 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 	return false
 }
 
-// format a new line, "%##v" only
-func (p *pp) newLine(depth int) {
-	if p.fmt.sharpsharpV { //"%##v" only
-		p.buf.WriteByte('\n')
-		for i := 0; i < depth; i++ {
-			p.buf.WriteString("    ")
-		}
-	}
-}
-
-// check if an array format need a new line
-func (p *pp) newLineInArray(elemKind reflect.Kind, index, size int) bool {
-	switch elemKind {
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
-		reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
-		return true
-	default:
-		if index == 0 && size >= maxArrayElemInLine || index > 0 && index%maxArrayElemInLine == 0 {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *pp) printArg(arg interface{}, verb rune) {
 	p.arg = arg
 	p.value = reflect.Value{}
@@ -724,6 +700,35 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 	}
 }
 
+// format a new line, "%##v" only
+func (p *pp) newLine(depth int) {
+	if p.fmt.sharpsharpV { //"%##v" only
+		p.buf.WriteByte('\n')
+		for i := 0; i < depth; i++ {
+			p.buf.WriteString("    ")
+		}
+	}
+}
+
+// check if an array format need a new line
+func (p *pp) newLineInArray(elemKind reflect.Kind, index, size int) bool {
+	switch elemKind {
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
+		reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
+		return true
+	default:
+		if index == 0 && size >= maxArrayElemInLine || index > 0 && index%maxArrayElemInLine == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// "%#v" "%##v" only
+func (p *pp) goSyntaxOnly() bool {
+	return p.fmt.goSyntaxOnly()
+}
+
 // printValue is similar to printArg but starts with a reflect value, not an interface{} value.
 // It does not handle 'p' and 'T' verbs because these should have been already handled by printArg.
 func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
@@ -781,7 +786,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.newLine(depth + 1)
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
-			if p.fmt.sharpV { //Go syntax
+			if p.goSyntaxOnly() { //Go syntax
 				p.buf.WriteByte(' ')
 			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
@@ -815,7 +820,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
-					if p.fmt.sharpV { //Go syntax
+					if p.goSyntaxOnly() { //Go syntax
 						p.buf.WriteByte(' ')
 					}
 				}

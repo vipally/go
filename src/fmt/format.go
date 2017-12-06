@@ -408,12 +408,17 @@ func (f *fmt) fmt_bx(b []byte, digits string) {
 	f.fmt_sbx("", b, digits)
 }
 
+// "%#v" "%##v" only
+func (f *fmt) goSyntaxOnly() bool {
+	return f.sharpsharpV //|| f.sharpV
+}
+
 // fmt_q formats a string as a double-quoted, escaped Go string constant.
 // If f.sharp is set a raw (backquoted) string may be returned instead
 // if the string does not contain any control characters other than tab.
 func (f *fmt) fmt_q(s string) {
 	s = f.truncate(s)
-	if (f.sharpsharpV || f.sharpV || f.sharp) && strconv.CanBackquote(s) {
+	if (f.goSyntaxOnly() || f.sharp) && strconv.CanBackquote(s) {
 		f.padString("`" + s + "`")
 		return
 	}
