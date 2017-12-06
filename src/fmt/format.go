@@ -35,9 +35,12 @@ type fmtFlags struct {
 	plusV  bool
 	sharpV bool
 
-	// use "%##v" to print a value as Go syntax with multi-line style
+	// use "%##v" to format a value with indented-multi-line style "%#v" string
 	sharpsharp  bool //"##"
 	sharpsharpV bool //"##v"
+	// use "%++v" to format a value with indented-multi-line style "%+v" string
+	plusplus  bool //"++"
+	plusplusV bool //"++v"
 }
 
 // A fmt is the raw formatter used by Printf etc.

@@ -700,9 +700,9 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 	}
 }
 
-// format a new line, "%##v" only
+// format a new line, "%##v" "%++v" only
 func (p *pp) newLine(depth int) {
-	if p.fmt.sharpsharpV { //"%##v" only
+	if p.fmt.sharpsharpV || p.fmt.plusplusV {
 		p.buf.WriteByte('\n')
 		for i := 0; i < depth; i++ {
 			p.buf.WriteString("    ")
@@ -1048,13 +1048,15 @@ formatLoop:
 			switch c {
 			case '#':
 				if p.fmt.sharp { // "##" found
-					println("sharpsharp")
 					p.fmt.sharpsharp = true
 				}
 				p.fmt.sharp = true
 			case '0':
 				p.fmt.zero = !p.fmt.minus // Only allow zero padding to the left.
 			case '+':
+				if p.fmt.plus { // "++" found
+					p.fmt.plusplus = true
+				}
 				p.fmt.plus = true
 			case '-':
 				p.fmt.minus = true
@@ -1070,13 +1072,16 @@ formatLoop:
 						p.fmt.sharpV = p.fmt.sharp
 						p.fmt.sharp = false
 
-						// Go syntax with multi-line format
-						p.fmt.sharpsharpV = p.fmt.sharpsharp
-						p.fmt.sharpsharp = false
-
 						// Struct-field syntax
 						p.fmt.plusV = p.fmt.plus
 						p.fmt.plus = false
+
+						// Go syntax with indented-multi-line format
+						p.fmt.sharpsharpV = p.fmt.sharpsharp
+						p.fmt.sharpsharp = false
+						// Struct-field syntax with indented-multi-line format
+						p.fmt.plusplusV = p.fmt.plusplus
+						p.fmt.plusplus = false
 					}
 					p.printArg(a[argNum], rune(c))
 					argNum++
@@ -1170,13 +1175,16 @@ formatLoop:
 			p.fmt.sharpV = p.fmt.sharp
 			p.fmt.sharp = false
 
-			// Go syntax with multi-line format
-			p.fmt.sharpsharpV = p.fmt.sharpsharp
-			p.fmt.sharpsharp = false
-
 			// Struct-field syntax
 			p.fmt.plusV = p.fmt.plus
 			p.fmt.plus = false
+
+			// Go syntax with indented-multi-line format
+			p.fmt.sharpsharpV = p.fmt.sharpsharp
+			p.fmt.sharpsharp = false
+			// Struct-field syntax with indented-multi-line format
+			p.fmt.plusplusV = p.fmt.plusplus
+			p.fmt.plusplus = false
 			fallthrough
 		default:
 			p.printArg(a[argNum], verb)
