@@ -666,25 +666,25 @@ var fmtTests = []struct {
 	{"%s", reflect.ValueOf(I(23)), `<23>`},
 
 	// go syntax
-	{"%#v", A{1, 2, "a", []int{1, 2}}, "fmt_test.A{i: 1, j: 0x2, s: `a`, x: []int{1, 2}}"},
+	{"%#v", A{1, 2, "a", []int{1, 2}}, `fmt_test.A{i:1, j:0x2, s:"a", x:[]int{1, 2}}`},
 	{"%#v", new(byte), "(*uint8)(0xPTR)"},
 	{"%#v", TestFmtInterface, "(func(*testing.T))(0xPTR)"},
 	{"%#v", make(chan int), "(chan int)(0xPTR)"},
 	{"%#v", uint64(1<<64 - 1), "0xffffffffffffffff"},
 	{"%#v", 1000000000, "1000000000"},
-	{"%#v", map[string]int{"a": 1}, "map[string]int{`a`: 1}"},
-	{"%#v", map[string]B{"a": {1, 2}}, "map[string]fmt_test.B{`a`: fmt_test.B{I: 1, j: 2}}"},
-	{"%#v", []string{"a", "b"}, "[]string{`a`, `b`}"},
-	{"%#v", SI{}, `fmt_test.SI{I: interface {}(nil)}`},
+	{"%#v", map[string]int{"a": 1}, `map[string]int{"a":1}`},
+	{"%#v", map[string]B{"a": {1, 2}}, `map[string]fmt_test.B{"a":fmt_test.B{I:1, j:2}}`},
+	{"%#v", []string{"a", "b"}, `[]string{"a", "b"}`},
+	{"%#v", SI{}, `fmt_test.SI{I:interface {}(nil)}`},
 	{"%#v", []int(nil), `[]int(nil)`},
 	{"%#v", []int{}, `[]int{}`},
 	{"%#v", array, `[5]int{1, 2, 3, 4, 5}`},
 	{"%#v", &array, `&[5]int{1, 2, 3, 4, 5}`},
-	{"%#v", iarray, "[4]interface {}{1, `hello`, 2.5, interface {}(nil)}"},
-	{"%#v", &iarray, "&[4]interface {}{1, `hello`, 2.5, interface {}(nil)}"},
+	{"%#v", iarray, `[4]interface {}{1, "hello", 2.5, interface {}(nil)}`},
+	{"%#v", &iarray, `&[4]interface {}{1, "hello", 2.5, interface {}(nil)}`},
 	{"%#v", map[int]byte(nil), `map[int]uint8(nil)`},
 	{"%#v", map[int]byte{}, `map[int]uint8{}`},
-	{"%#v", "foo", "`foo`"},
+	{"%#v", "foo", `"foo"`},
 	{"%#v", barray, `[5]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5}`},
 	{"%#v", bslice, `[]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5}`},
 	{"%#v", []int32(nil), "[]int32(nil)"},
@@ -799,7 +799,7 @@ var fmtTests = []struct {
 
 	// GoStringer
 	{"%#v", G(6), "GoString(6)"},
-	{"%#v", S{F(7), G(8)}, "fmt_test.S{F: <v=F(7)>, G: GoString(8)}"},
+	{"%#v", S{F(7), G(8)}, "fmt_test.S{F:<v=F(7)>, G:GoString(8)}"},
 
 	// %T
 	{"%T", byte(0), "uint8"},
@@ -1467,7 +1467,7 @@ func TestStructPrinter(t *testing.T) {
 	}{
 		{"%v", "{abc def 123}"},
 		{"%+v", "{a:abc b:def c:123}"},
-		{"%#v", "fmt_test.T{a: `abc`, b: `def`, c: 123}"},
+		{"%#v", `fmt_test.T{a:"abc", b:"def", c:123}`},
 	}
 	for _, tt := range tests {
 		out := Sprintf(tt.fmt, s)
