@@ -1468,6 +1468,8 @@ func TestStructPrinter(t *testing.T) {
 		{"%v", "{abc def 123}"},
 		{"%+v", "{a:abc b:def c:123}"},
 		{"%#v", `fmt_test.T{a:"abc", b:"def", c:123}`},
+		{"%++v", "{\n    a: abc \n    b: def \n    c: 123\n}"},
+		{"%##v", "fmt_test.T{\n    a: `abc`, \n    b: `def`, \n    c: 123, \n}"},
 	}
 	for _, tt := range tests {
 		out := Sprintf(tt.fmt, s)

@@ -412,9 +412,10 @@ func (f *fmt) fmt_bx(b []byte, digits string) {
 	f.fmt_sbx("", b, digits)
 }
 
-// "%#v" "%##v" only
-func (f *fmt) goSyntaxOnly() bool {
-	return f.sharpsharpV //|| f.sharpV
+// "%##v" "%++v" only ("%#v" "%+v" optional)
+func (f *fmt) extendVflagOnly() bool {
+	// do not effect exists "%#v" "%+v", so do not include sharpV and plusV
+	return f.sharpsharpV || f.plusplusV //|| f.sharpV || f.plusV
 }
 
 // fmt_q formats a string as a double-quoted, escaped Go string constant.
@@ -422,7 +423,7 @@ func (f *fmt) goSyntaxOnly() bool {
 // if the string does not contain any control characters other than tab.
 func (f *fmt) fmt_q(s string) {
 	s = f.truncate(s)
-	if (f.goSyntaxOnly() || f.sharp) && strconv.CanBackquote(s) {
+	if (f.extendVflagOnly() || f.sharp) && strconv.CanBackquote(s) {
 		f.padString("`" + s + "`")
 		return
 	}

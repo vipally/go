@@ -724,9 +724,9 @@ func (p *pp) newLineInArray(elemKind reflect.Kind, index, size int) bool {
 	return false
 }
 
-// "%#v" "%##v" only
-func (p *pp) goSyntaxOnly() bool {
-	return p.fmt.goSyntaxOnly()
+// "%##v" "%++v" only ("%#v" "%+v" optional)
+func (p *pp) extendVflagOnly() bool {
+	return p.fmt.extendVflagOnly()
 }
 
 // printValue is similar to printArg but starts with a reflect value, not an interface{} value.
@@ -786,7 +786,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.newLine(depth + 1)
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
-			if p.goSyntaxOnly() { //Go syntax
+			if p.extendVflagOnly() { //Go syntax
 				p.buf.WriteByte(' ')
 			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
@@ -820,7 +820,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
-					if p.goSyntaxOnly() { //Go syntax
+					if p.extendVflagOnly() { //Go syntax
 						p.buf.WriteByte(' ')
 					}
 				}
@@ -919,7 +919,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			switch a := f.Elem(); a.Kind() {
 			case reflect.Array, reflect.Slice, reflect.Struct, reflect.Map:
 				p.buf.WriteByte('&')
-				p.printValue(a, verb, depth+1)
+				p.printValue(a, verb, depth) //pointer do not increase depth
 				return
 			}
 		}
