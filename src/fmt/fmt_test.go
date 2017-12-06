@@ -698,9 +698,46 @@ var fmtTests = []struct {
 	{"%#v", reflect.ValueOf([]byte{}), "[]uint8{}"},
 	{"%#v", reflect.ValueOf([]uint8{}), "[]uint8{}"},
 	{"%#v", &[]byte{}, "&[]uint8{}"},
-	{"%#v", &[]byte{}, "&[]uint8{}"},
+	{"%#v", &[]uint8{}, "&[]uint8{}"},
 	{"%#v", [3]byte{}, "[3]uint8{0x0, 0x0, 0x0}"},
 	{"%#v", [3]uint8{}, "[3]uint8{0x0, 0x0, 0x0}"},
+
+	// go syntax with indented-multi-line style string
+	{"%##v", A{1, 2, "a", []int{1, 2}}, `fmt_test.A{i:1, j:0x2, s:"a", x:[]int{1, 2}}`},
+	{"%##v", new(byte), "(*uint8)(0xPTR)"},
+	{"%##v", TestFmtInterface, "(func(*testing.T))(0xPTR)"},
+	{"%##v", make(chan int), "(chan int)(0xPTR)"},
+	{"%##v", uint64(1<<64 - 1), "0xffffffffffffffff"},
+	{"%##v", 1000000000, "1000000000"},
+	{"%##v", map[string]int{"a": 1}, `map[string]int{"a":1}`},
+	{"%##v", map[string]B{"a": {1, 2}}, `map[string]fmt_test.B{"a":fmt_test.B{I:1, j:2}}`},
+	{"%##v", []string{"a", "b"}, `[]string{"a", "b"}`},
+	{"%##v", SI{}, `fmt_test.SI{I:interface {}(nil)}`},
+	{"%##v", []int(nil), `[]int(nil)`},
+	{"%##v", []int{}, `[]int{}`},
+	{"%##v", array, `[5]int{1, 2, 3, 4, 5}`},
+	{"%##v", &array, `&[5]int{1, 2, 3, 4, 5}`},
+	{"%##v", iarray, `[4]interface {}{1, "hello", 2.5, interface {}(nil)}`},
+	{"%##v", &iarray, `&[4]interface {}{1, "hello", 2.5, interface {}(nil)}`},
+	{"%##v", map[int]byte(nil), `map[int]uint8(nil)`},
+	{"%##v", map[int]byte{}, `map[int]uint8{}`},
+	{"%##v", "foo", `"foo"`},
+	{"%##v", barray, `[5]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5}`},
+	{"%##v", bslice, `[]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5}`},
+	{"%##v", []int32(nil), "[]int32(nil)"},
+	{"%##v", 1.2345678, "1.2345678"},
+	{"%##v", float32(1.2345678), "1.2345678"},
+	// Only print []byte and []uint8 as type []byte if they appear at the top level.
+	{"%##v", []byte(nil), "[]byte(nil)"},
+	{"%##v", []uint8(nil), "[]byte(nil)"},
+	{"%##v", []byte{}, "[]byte{}"},
+	{"%##v", []uint8{}, "[]byte{}"},
+	{"%##v", reflect.ValueOf([]byte{}), "[]uint8{}"},
+	{"%##v", reflect.ValueOf([]uint8{}), "[]uint8{}"},
+	{"%##v", &[]byte{}, "&[]uint8{}"},
+	{"%##v", &[]uint8{}, "&[]uint8{}"},
+	{"%##v", [3]byte{}, "[3]uint8{0x0, 0x0, 0x0}"},
+	{"%##v", [3]uint8{}, "[3]uint8{0x0, 0x0, 0x0}"},
 
 	// slices with other formats
 	{"%#x", []int{1, 2, 15}, `[0x1 0x2 0xf]`},
@@ -1083,7 +1120,7 @@ func TestSprintf(t *testing.T) {
 				// It's too confusing to read the errors.
 				t.Errorf("Sprintf(%q, %q) = <%s> want <%s>", tt.fmt, tt.val, s, tt.out)
 			} else {
-				t.Errorf("Sprintf(%q, %v) = %q want %q", tt.fmt, tt.val, s, tt.out)
+				t.Errorf("Sprintf(%q, %v) = %q want %q\n%s", tt.fmt, tt.val, s, tt.out, s)
 			}
 		}
 	}
