@@ -174,9 +174,9 @@ func (p *pp) Flag(b int) bool {
 	case '-':
 		return p.fmt.minus
 	case '+':
-		return p.fmt.plus || p.fmt.plusV
+		return p.fmt.plus || p.fmt.plusV || p.fmt.plusplusV
 	case '#':
-		return p.fmt.sharp || p.fmt.sharpV
+		return p.fmt.sharp || p.fmt.sharpV || p.fmt.sharpsharpV
 	case ' ':
 		return p.fmt.space
 	case '0':
@@ -380,7 +380,7 @@ func (p *pp) fmt0x64(v uint64, leading0x bool) {
 func (p *pp) fmtInteger(v uint64, isSigned bool, verb rune) {
 	switch verb {
 	case 'v':
-		if p.fmt.sharpV && !isSigned {
+		if (p.fmt.sharpV || p.fmt.sharpsharpV) && !isSigned {
 			p.fmt0x64(v, true)
 		} else {
 			p.fmt.fmt_integer(v, 10, isSigned, ldigits)
@@ -451,7 +451,7 @@ func (p *pp) fmtComplex(v complex128, size int, verb rune) {
 func (p *pp) fmtString(v string, verb rune) {
 	switch verb {
 	case 'v':
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.fmt.fmt_q(v)
 		} else {
 			p.fmt.fmt_s(v)
@@ -472,7 +472,7 @@ func (p *pp) fmtString(v string, verb rune) {
 func (p *pp) fmtBytes(v []byte, verb rune, typeString string) {
 	switch verb {
 	case 'v', 'd':
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteString(typeString)
 			if v == nil {
 				p.buf.WriteString(nilParenString)
@@ -521,7 +521,7 @@ func (p *pp) fmtPointer(value reflect.Value, verb rune) {
 
 	switch verb {
 	case 'v':
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteByte('(')
 			p.buf.WriteString(value.Type().String())
 			p.buf.WriteString(")(")
@@ -592,7 +592,7 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 	}
 
 	// If we're doing Go syntax and the argument knows how to supply it, take care of it now.
-	if p.fmt.sharpV {
+	if p.fmt.sharpV || p.fmt.sharpsharpV {
 		if stringer, ok := p.arg.(GoStringer); ok {
 			handled = true
 			defer p.catchPanic(p.arg, verb)
@@ -766,7 +766,7 @@ func (p *pp) writeValueSetHead(v reflect.Value) bool {
 			p.buf.WriteString(mapString)
 		}
 	case reflect.Slice, reflect.Array:
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteString(v.Type().String())
 			if kind == reflect.Slice && v.IsNil() {
 				p.buf.WriteString(nilParenString)
@@ -828,7 +828,7 @@ func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
 func (p *pp) truncateLastElemSeparator(numElem, lines int) {
 	if numElem > 0 {
 		if lines == 0 || !p.extendVflagOnly() {
-			if p.fmt.sharpV {
+			if p.fmt.sharpV || p.fmt.sharpsharpV {
 				p.buf.TruncateTail(2) //remove last commaSpaceString
 			} else {
 				p.buf.TruncateTail(1) //remove last ' '
@@ -1246,10 +1246,10 @@ formatLoop:
 			p.fmt.plusV = p.fmt.plus
 			p.fmt.plus = false
 
-			// Go syntax with indented-multi-line format
+			// Go syntax with indented-multi-lines format
 			p.fmt.sharpsharpV = p.fmt.sharpsharp
 			p.fmt.sharpsharp = false
-			// Struct-field syntax with indented-multi-line format
+			// Struct-field syntax with indented-multi-lines format
 			p.fmt.plusplusV = p.fmt.plusplus
 			p.fmt.plusplus = false
 			fallthrough
