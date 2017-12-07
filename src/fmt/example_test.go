@@ -28,7 +28,7 @@ func ExampleStringer() {
 	// Output: Gopher (2)
 }
 
-func ExamplePrintf_vFlag() {
+func ExamplePrintf_flagV() {
 	type X struct {
 		A int
 		B string
@@ -50,7 +50,7 @@ func ExamplePrintf_vFlag() {
 				A: 123,
 				B: `"b" = 1`,
 			},
-			E: []int{1, 2, 3, 4, 5},
+			E: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
 			F: [2]string{
 				`aaa`,
 				`bbb`,
@@ -65,17 +65,19 @@ func ExamplePrintf_vFlag() {
 			`abc`: 456,
 		},
 	}
-	fmt.Printf("\n\"%%v\":\n%v\n", z)
+	fmt.Printf("-------\n\"%%v\":\n%v\n", z)
 	fmt.Printf("-------\n\"%%#v\":\n%#v\n", z)
 	fmt.Printf("-------\n\"%%##\"v:\n%##v\n", z)
 	fmt.Printf("-------\n\"%%+v\":\n%+v\n", z)
 	fmt.Printf("-------\n\"%%++v\":\n%++v\n", z)
+
 	// Output:
+	// -------
 	// "%v":
-	// {{{123 "b" = 1} [1 2 3 4 5] [aaa bbb]} zzz [c:\x\y\z d:\a\b\c] map[abc:456]}
+	// {{{123 "b" = 1} [1 2 3 4 5 6 7 8 9 10 11 12] [aaa bbb]} zzz [c:\x\y\z d:\a\b\c] map[abc:456]}
 	// -------
 	// "%#v":
-	// fmt_test.Z{G:fmt_test.Y{D:fmt_test.X{A:123, B:"\"b\" = 1"}, E:[]int{1, 2, 3, 4, 5}, F:[2]string{"aaa", "bbb"}}, H:"zzz", I:[]string{"c:\\x\\y\\z", "d:\\a\\b\\c"}, J:map[string]int{"abc":456}}
+	// fmt_test.Z{G:fmt_test.Y{D:fmt_test.X{A:123, B:"\"b\" = 1"}, E:[]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, F:[2]string{"aaa", "bbb"}}, H:"zzz", I:[]string{"c:\\x\\y\\z", "d:\\a\\b\\c"}, J:map[string]int{"abc":456}}
 	// -------
 	// "%##"v:
 	// fmt_test.Z{
@@ -84,7 +86,10 @@ func ExamplePrintf_vFlag() {
 	//             A: 123,
 	//             B: `"b" = 1`,
 	//         },
-	//         E: []int{1, 2, 3, 4, 5},
+	//         E: []int{
+	//             1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+	//             11, 12,
+	//         },
 	//         F: [2]string{
 	//             `aaa`,
 	//             `bbb`,
@@ -101,7 +106,7 @@ func ExamplePrintf_vFlag() {
 	// }
 	// -------
 	// "%+v":
-	// {G:{D:{A:123 B:"b" = 1} E:[1 2 3 4 5] F:[aaa bbb]} H:zzz I:[c:\x\y\z d:\a\b\c] J:map[abc:456]}
+	// {G:{D:{A:123 B:"b" = 1} E:[1 2 3 4 5 6 7 8 9 10 11 12] F:[aaa bbb]} H:zzz I:[c:\x\y\z d:\a\b\c] J:map[abc:456]}
 	// -------
 	// "%++v":
 	// {
@@ -110,7 +115,10 @@ func ExamplePrintf_vFlag() {
 	//             A: 123
 	//             B: "b" = 1
 	//         }
-	//         E: [1 2 3 4 5]
+	//         E: [
+	//             1 2 3 4 5 6 7 8 9 10
+	//             11 12
+	//         ]
 	//         F: [
 	//             aaa
 	//             bbb
