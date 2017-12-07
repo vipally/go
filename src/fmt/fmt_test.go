@@ -703,27 +703,27 @@ var fmtTests = []struct {
 	{"%#v", [3]uint8{}, "[3]uint8{0x0, 0x0, 0x0}"},
 
 	// go syntax with indented-multi-line style string
-	{"%##v", A{1, 2, "a", []int{1, 2}}, "fmt_test.A{\n    i: 1, \n    j: 0x2, \n    s: `a`, \n    x: []int{1, 2, }, \n}"},
+	{"%##v", A{1, 2, "a", []int{1, 2}}, "fmt_test.A{\n    i: 1,\n    j: 0x2,\n    s: `a`,\n    x: []int{1, 2},\n}"},
 	{"%##v", new(byte), "(*uint8)(0xPTR)"},
 	{"%##v", TestFmtInterface, "(func(*testing.T))(0xPTR)"},
 	{"%##v", make(chan int), "(chan int)(0xPTR)"},
 	{"%##v", uint64(1<<64 - 1), "0xffffffffffffffff"},
 	{"%##v", 1000000000, "1000000000"},
-	{"%##v", map[string]int{"a": 1}, "map[string]int{\n    `a`: 1, \n}"},
-	{"%##v", map[string]B{"a": {1, 2}}, "map[string]fmt_test.B{\n    `a`: fmt_test.B{\n        I: 1, \n        j: 2, \n    }, \n}"},
-	{"%##v", []string{"a", "b"}, "[]string{\n    `a`, \n    `b`, \n}"},
-	{"%##v", SI{}, "fmt_test.SI{\n    I: interface {}(nil), \n}"},
+	{"%##v", map[string]int{"a": 1}, "map[string]int{\n    `a`: 1,\n}"},
+	{"%##v", map[string]B{"a": {1, 2}}, "map[string]fmt_test.B{\n    `a`: fmt_test.B{\n        I: 1,\n        j: 2,\n    },\n}"},
+	{"%##v", []string{"a", "b"}, "[]string{\n    `a`,\n    `b`,\n}"},
+	{"%##v", SI{}, "fmt_test.SI{\n    I: interface {}(nil),\n}"},
 	{"%##v", []int(nil), `[]int(nil)`},
 	{"%##v", []int{}, `[]int{}`},
-	{"%##v", array, "[5]int{1, 2, 3, 4, 5, }"},
-	{"%##v", &array, "&[5]int{1, 2, 3, 4, 5, }"},
-	{"%##v", iarray, "[4]interface {}{1, `hello`, 2.5, interface {}(nil), }"},
-	{"%##v", &iarray, "&[4]interface {}{1, `hello`, 2.5, interface {}(nil), }"},
+	{"%##v", array, "[5]int{1, 2, 3, 4, 5}"},
+	{"%##v", &array, "&[5]int{1, 2, 3, 4, 5}"},
+	{"%##v", iarray, "[4]interface {}{1, `hello`, 2.5, interface {}(nil)}"},
+	{"%##v", &iarray, "&[4]interface {}{1, `hello`, 2.5, interface {}(nil)}"},
 	{"%##v", map[int]byte(nil), `map[int]uint8(nil)`},
 	{"%##v", map[int]byte{}, "map[int]uint8{\n}"},
 	{"%##v", "foo", "`foo`"},
-	{"%##v", barray, "[5]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5, }"},
-	{"%##v", bslice, "[]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5, }"},
+	{"%##v", barray, "[5]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5}"},
+	{"%##v", bslice, "[]fmt_test.renamedUint8{0x1, 0x2, 0x3, 0x4, 0x5}"},
 	{"%##v", []int32(nil), "[]int32(nil)"},
 	{"%##v", 1.2345678, "1.2345678"},
 	{"%##v", float32(1.2345678), "1.2345678"},
@@ -736,14 +736,14 @@ var fmtTests = []struct {
 	{"%##v", reflect.ValueOf([]uint8{}), "[]uint8{}"},
 	{"%##v", &[]byte{}, "&[]uint8{}"},
 	{"%##v", &[]uint8{}, "&[]uint8{}"},
-	{"%##v", [3]byte{}, "[3]uint8{0x0, 0x0, 0x0, }"},
-	{"%##v", [3]uint8{}, "[3]uint8{0x0, 0x0, 0x0, }"},
+	{"%##v", [3]byte{}, "[3]uint8{0x0, 0x0, 0x0}"},
+	{"%##v", [3]uint8{}, "[3]uint8{0x0, 0x0, 0x0}"},
 
 	// struct syntax
 	{"%+v", A{1, 2, "a", []int{1, 2}}, "{i:1 j:2 s:a x:[1 2]}"},
-	//{"%+v", new(byte), "0xc0420580fPTR"},
-	//{"%+v", TestFmtInterface, "(func(*testing.T))(0xPTR)"},
-	//{"%+v", make(chan int), "(chan int)(0xPTR)"},
+	//{"%+v", new(byte), "0xc0420560fPTR"},
+	//{"%+v", TestFmtInterface, "0x4ffd90"},
+	//{"%+v", make(chan int), "0xc042048240"},
 	{"%+v", uint64(1<<64 - 1), "18446744073709551615"},
 	{"%+v", 1000000000, "1000000000"},
 	{"%+v", map[string]int{"a": 1}, "map[a:1]"},
@@ -764,7 +764,6 @@ var fmtTests = []struct {
 	{"%+v", []int32(nil), "[]"},
 	{"%+v", 1.2345678, "1.2345678"},
 	{"%+v", float32(1.2345678), "1.2345678"},
-	// Only print []byte and []uint8 as type []byte if they appear at the top level.
 	{"%+v", []byte(nil), "[]"},
 	{"%+v", []uint8(nil), "[]"},
 	{"%+v", []byte{}, "[]"},
@@ -777,15 +776,15 @@ var fmtTests = []struct {
 	{"%+v", [3]uint8{}, "[0 0 0]"},
 
 	// struct syntax with indented-multi-line style string
-	{"%++v", A{1, 2, "a", []int{1, 2}}, "{\n    i: 1 \n    j: 2 \n    s: a \n    x: [1 2]\n}"},
-	//{"%++v", new(byte), "(*uint8)(0xPTR)"},
-	//{"%++v", TestFmtInterface, "(func(*testing.T))(0xPTR)"},
-	//{"%++v", make(chan int), "(chan int)(0xPTR)"},
+	{"%++v", A{1, 2, "a", []int{1, 2}}, "{\n    i: 1\n    j: 2\n    s: a\n    x: [1 2]\n}"},
+	//{"%++v", new(byte), "0xc0420560fPTR"},
+	//{"%++v", TestFmtInterface, "0x4ffd90"},
+	//{"%++v", make(chan int), "0xc042048240"},
 	{"%++v", uint64(1<<64 - 1), "18446744073709551615"},
 	{"%++v", 1000000000, "1000000000"},
 	{"%++v", map[string]int{"a": 1}, "map[\n    a: 1\n]"},
-	{"%++v", map[string]B{"a": {1, 2}}, "map[\n    a: {\n        I: <1> \n        j: 2\n    }\n]"},
-	{"%++v", []string{"a", "b"}, "[a b]"},
+	{"%++v", map[string]B{"a": {1, 2}}, "map[\n    a: {\n        I: <1>\n        j: 2\n    }\n]"},
+	{"%++v", []string{"a", "b"}, "[\n    a\n    b\n]"},
 	{"%++v", SI{}, "{\n    I: <nil>\n}"},
 	{"%++v", []int(nil), "[]"},
 	{"%++v", []int{}, "[]"},
@@ -801,7 +800,6 @@ var fmtTests = []struct {
 	{"%++v", []int32(nil), "[]"},
 	{"%++v", 1.2345678, "1.2345678"},
 	{"%++v", float32(1.2345678), "1.2345678"},
-	// Only print []byte and []uint8 as type []byte if they appear at the top level.
 	{"%++v", []byte(nil), "[]"},
 	{"%++v", []uint8(nil), "[]"},
 	{"%++v", []byte{}, "[]"},
@@ -1194,7 +1192,7 @@ func TestSprintf(t *testing.T) {
 				// It's too confusing to read the errors.
 				t.Errorf("Sprintf(%q, %q) = <%s> want <%s>", tt.fmt, tt.val, s, tt.out)
 			} else {
-				t.Errorf("Sprintf(%q, %v) = %q want %q\n%s", tt.fmt, tt.val, s, tt.out, s)
+				t.Errorf("Sprintf(%q, %v) = %q want %q", tt.fmt, tt.val, s, tt.out)
 			}
 		}
 	}
@@ -1579,8 +1577,8 @@ func TestStructPrinter(t *testing.T) {
 		{"%v", "{abc def 123}"},
 		{"%+v", "{a:abc b:def c:123}"},
 		{"%#v", `fmt_test.T{a:"abc", b:"def", c:123}`},
-		{"%++v", "{\n    a: abc \n    b: def \n    c: 123\n}"},
-		{"%##v", "fmt_test.T{\n    a: `abc`, \n    b: `def`, \n    c: 123, \n}"},
+		{"%++v", "{\n    a: abc\n    b: def\n    c: 123\n}"},
+		{"%##v", "fmt_test.T{\n    a: `abc`,\n    b: `def`,\n    c: 123,\n}"},
 	}
 	for _, tt := range tests {
 		out := Sprintf(tt.fmt, s)

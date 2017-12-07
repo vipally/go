@@ -31,7 +31,7 @@ const (
 	noVerbString      = "%!(NOVERB)"
 	invReflectString  = "<invalid reflect.Value>"
 
-	maxArrayElemInLine = 10 //in "%##v" format, while array too long, put a new line
+	maxArrayElemInLine = 10 //in "%##v" "%++v" format, while array too long, put a new line
 )
 
 // State represents the printer state passed to custom formatters.
@@ -80,6 +80,17 @@ type buffer []byte
 func (b *buffer) TruncateTail(n int) {
 	if size := len(*b); size >= n {
 		*b = (*b)[:size-n]
+	}
+}
+
+//TrimTail remove all ' ' from buffer tail
+func (b *buffer) TrimTail() {
+	for len(*b) > 0 {
+		if last := (*b)[len(*b)-1]; last == ' ' {
+			b.TruncateTail(1) //remove last ' '
+		} else {
+			break
+		}
 	}
 }
 
@@ -700,9 +711,10 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 	}
 }
 
-// format a new line, "%##v" "%++v" only
-func (p *pp) newLine(depth int) {
+// format a new line, for "%##v" "%++v" only
+func (p *pp) newLineIfRequire(depth int) {
 	if p.fmt.sharpsharpV || p.fmt.plusplusV {
+		p.buf.TrimTail() //remove last ' '
 		p.buf.WriteByte('\n')
 		for i := 0; i < depth; i++ {
 			p.buf.WriteString("    ")
@@ -711,14 +723,17 @@ func (p *pp) newLine(depth int) {
 }
 
 // check if an array format need a new line
-func (p *pp) newLineInArray(elemKind reflect.Kind, index, size int) bool {
-	switch elemKind {
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
-		reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
-		return true
-	default:
-		if index == 0 && size >= maxArrayElemInLine || index > 0 && index%maxArrayElemInLine == 0 {
+func (p *pp) arrayRequireNewLine(elemKind reflect.Kind, index, size int) bool {
+	if p.fmt.sharpsharpV || p.fmt.plusplusV {
+		switch elemKind {
+		case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
+			reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
 			return true
+		default:
+			//put a new line every maxArrayElemInLine element
+			if index == 0 && size >= maxArrayElemInLine || index > 0 && index%maxArrayElemInLine == 0 {
+				return true
+			}
 		}
 	}
 	return false
@@ -727,6 +742,93 @@ func (p *pp) newLineInArray(elemKind reflect.Kind, index, size int) bool {
 // "%##v" "%++v" only ("%#v" "%+v" optional)
 func (p *pp) extendVflagOnly() bool {
 	return p.fmt.extendVflagOnly()
+}
+
+func (p *pp) writeValueSetHead(v reflect.Value) bool {
+	switch kind := v.Kind(); kind {
+	case reflect.Struct:
+		if p.fmt.sharpV {
+			p.buf.WriteString(v.Type().String())
+		}
+		p.buf.WriteByte('{')
+	case reflect.Map:
+		if p.fmt.sharpV {
+			p.buf.WriteString(v.Type().String())
+			if v.IsNil() {
+				p.buf.WriteString(nilParenString)
+				return false
+			}
+			p.buf.WriteByte('{')
+		} else {
+			p.buf.WriteString(mapString)
+		}
+	case reflect.Slice, reflect.Array:
+		if p.fmt.sharpV {
+			p.buf.WriteString(v.Type().String())
+			if kind == reflect.Slice && v.IsNil() {
+				p.buf.WriteString(nilParenString)
+				return false
+			}
+			p.buf.WriteByte('{')
+		} else {
+			p.buf.WriteByte('[')
+		}
+	default:
+		panic("error")
+	}
+	return true
+}
+
+// write element separator
+func (p *pp) writeElemSeparator() {
+	switch {
+	case p.fmt.sharpV:
+		p.buf.WriteString(commaSpaceString)
+	default:
+		p.buf.WriteByte(' ')
+	}
+}
+
+func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
+	switch kind {
+	case reflect.Map:
+		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
+		p.newLineIfRequire(depth)
+		if p.fmt.sharpV {
+			p.buf.WriteByte('}')
+		} else {
+			p.buf.WriteByte(']')
+		}
+	case reflect.Struct:
+		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
+		p.newLineIfRequire(depth)
+		p.buf.WriteByte('}')
+	case reflect.Slice, reflect.Array:
+		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
+		if lines > 0 {
+			p.newLineIfRequire(depth)
+		}
+		if p.fmt.sharpV {
+			p.buf.WriteByte('}')
+		} else {
+			p.buf.WriteByte(']')
+		}
+	default:
+		panic("error")
+	}
+}
+
+// truncate last element separator
+func (p *pp) truncateLastElemSeparator(numElem, lines int) {
+	if numElem > 0 {
+		if lines == 0 || !p.extendVflagOnly() {
+			if p.fmt.sharpV {
+				p.buf.TruncateTail(2) //remove last commaSpaceString
+			} else {
+				p.buf.TruncateTail(1) //remove last ' '
+			}
+		}
+	}
 }
 
 // printValue is similar to printArg but starts with a reflect value, not an interface{} value.
@@ -771,77 +873,43 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 	case reflect.String:
 		p.fmtString(f.String(), verb)
 	case reflect.Map:
-		if p.fmt.sharpV {
-			p.buf.WriteString(f.Type().String())
-			if f.IsNil() {
-				p.buf.WriteString(nilParenString)
-				return
-			}
-			p.buf.WriteByte('{')
-		} else {
-			p.buf.WriteString(mapString)
+		if !p.writeValueSetHead(f) {
+			return
 		}
 		keys := f.MapKeys()
 		for _, key := range keys {
-			p.newLine(depth + 1)
+			p.newLineIfRequire(depth + 1)
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
-			if p.extendVflagOnly() { //Go syntax
+			if p.extendVflagOnly() {
 				p.buf.WriteByte(' ')
 			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
-			if p.fmt.sharpV {
-				p.buf.WriteString(commaSpaceString)
-			} else {
-				p.buf.WriteByte(' ')
-			}
+			p.writeElemSeparator() // commaSpaceString or ' '
 		}
-		if p.fmt.sharpV {
-			if !p.fmt.sharpsharpV && len(keys) > 0 {
-				p.buf.TruncateTail(2) //remove last commaSpaceString
-			}
-			p.newLine(depth)
-			p.buf.WriteByte('}')
-		} else {
-			if len(keys) > 0 {
-				p.buf.TruncateTail(1) //remove last ' '
-			}
-			p.newLine(depth)
-			p.buf.WriteByte(']')
-		}
+		p.writeValueSetTail(f.Kind(), len(keys), len(keys), depth)
+
 	case reflect.Struct:
-		if p.fmt.sharpV {
-			p.buf.WriteString(f.Type().String())
+		if !p.writeValueSetHead(f) {
+			return
 		}
-		p.buf.WriteByte('{')
 		numField := f.NumField()
 		for i := 0; i < numField; i++ {
-			p.newLine(depth + 1)
+			p.newLineIfRequire(depth + 1)
 			if p.fmt.plusV || p.fmt.sharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
-					if p.extendVflagOnly() { //Go syntax
+					if p.extendVflagOnly() {
 						p.buf.WriteByte(' ')
 					}
 				}
 			}
 			p.printValue(getField(f, i), verb, depth+1)
-			if p.fmt.sharpV {
-				p.buf.WriteString(commaSpaceString)
-			} else {
-				p.buf.WriteByte(' ')
-			}
+			p.writeElemSeparator() // commaSpaceString or ' '
 		}
-		if !p.fmt.sharpsharpV && numField > 0 {
-			if p.fmt.sharpV {
-				p.buf.TruncateTail(2) //remove last commaSpaceString
-			} else {
-				p.buf.TruncateTail(1) //remove last ' '
-			}
-		}
-		p.newLine(depth)
-		p.buf.WriteByte('}')
+		p.writeValueSetTail(f.Kind(), numField, numField, depth)
+
 	case reflect.Interface:
 		value := f.Elem()
 		if !value.IsValid() {
@@ -856,6 +924,22 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 		}
 	case reflect.Array, reflect.Slice:
 		switch verb {
+		case 'v':
+			if !p.writeValueSetHead(f) {
+				return
+			}
+			lines, size := 0, f.Len()
+			elemKind := f.Type().Elem().Kind()
+			for i := 0; i < size; i++ {
+				if p.arrayRequireNewLine(elemKind, i, size) {
+					lines++
+					p.newLineIfRequire(depth + 1)
+				}
+				p.printValue(f.Index(i), verb, depth+1)
+				p.writeElemSeparator() // commaSpaceString or ' '
+			}
+			p.writeValueSetTail(f.Kind(), size, lines, depth)
+
 		case 's', 'q', 'x', 'X':
 			// Handle byte and uint8 slices and arrays special for the above verbs.
 			t := f.Type()
@@ -877,33 +961,9 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				p.fmtBytes(bytes, verb, t.String())
 				return
 			}
-		}
-		if p.fmt.sharpV {
-			p.buf.WriteString(f.Type().String())
-			if f.Kind() == reflect.Slice && f.IsNil() {
-				p.buf.WriteString(nilParenString)
-				return
-			}
-			p.buf.WriteByte('{')
-			lines := 0
-			elemKind := f.Type().Elem().Kind()
-			size := f.Len()
-			for i := 0; i < size; i++ {
-				if p.newLineInArray(elemKind, i, size) {
-					lines++
-					p.newLine(depth + 1)
-				}
-				p.printValue(f.Index(i), verb, depth+1)
-				p.buf.WriteString(commaSpaceString)
-			}
-			if !p.fmt.sharpsharpV && size > 0 {
-				p.buf.TruncateTail(2) //remove last commaSpaceString
-			}
-			if lines > 0 {
-				p.newLine(depth)
-			}
-			p.buf.WriteByte('}')
-		} else {
+			fallthrough
+
+		default:
 			p.buf.WriteByte('[')
 			for i := 0; i < f.Len(); i++ {
 				if i > 0 {
@@ -913,6 +973,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			}
 			p.buf.WriteByte(']')
 		}
+
 	case reflect.Ptr:
 		// pointer to array or slice or struct? ok at top level
 		// but not embedded (avoid loops)
