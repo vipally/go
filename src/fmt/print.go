@@ -76,24 +76,6 @@ type GoStringer interface {
 // Use simple []byte instead of bytes.Buffer to avoid large dependency.
 type buffer []byte
 
-// TruncateTail remove the last n bytes from buffer.
-func (b *buffer) TruncateTail(n int) {
-	if size := len(*b); size >= n {
-		*b = (*b)[:size-n]
-	}
-}
-
-//TrimTail remove all ' ' from buffer tail
-func (b *buffer) TrimTail() {
-	for len(*b) > 0 {
-		if last := (*b)[len(*b)-1]; last == ' ' {
-			b.TruncateTail(1) //remove last ' '
-		} else {
-			break
-		}
-	}
-}
-
 func (b *buffer) Write(p []byte) {
 	*b = append(*b, p...)
 }
@@ -712,14 +694,19 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 }
 
 // format a new line, for "%##v" "%++v" only
-func (p *pp) newLineIfRequire(depth int) {
+func (p *pp) newLineIfRequire(depth int, last bool) bool {
 	if p.fmt.sharpsharpV || p.fmt.plusplusV {
-		p.buf.TrimTail() //remove last ' '
+		//if the last line of data set, the depth will decrease
+		if last {
+			depth--
+		}
 		p.buf.WriteByte('\n')
 		for i := 0; i < depth; i++ {
 			p.buf.WriteString("    ")
 		}
+		return true
 	}
+	return false
 }
 
 // check if an array format need a new line
@@ -784,35 +771,32 @@ func (p *pp) writeValueSetHead(v reflect.Value) bool {
 }
 
 // write element separator in value sets(struct, map, slice, array).
-func (p *pp) writeElemSeparator() {
-	switch {
-	case p.fmt.sharpV || p.fmt.sharpsharpV:
-		p.buf.WriteString(commaSpaceString)
-	default:
-		p.buf.WriteByte(' ')
+// element separator includes the probably new line
+func (p *pp) writeElemSeparator(newLine, last bool, depth int) {
+	if p.fmt.sharpV || p.fmt.sharpsharpV {
+		if !last || newLine && p.fmt.sharpsharpV {
+			p.buf.WriteByte(',')
+		}
+	}
+	if !(newLine && p.newLineIfRequire(depth, last)) {
+		if !last {
+			p.buf.WriteByte(' ')
+		}
 	}
 }
 
 // write tail of a value set(struct, map, slice, array)
-func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
+func (p *pp) writeValueSetTail(kind reflect.Kind) {
 	switch kind {
 	case reflect.Map:
-		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
-		p.newLineIfRequire(depth)
 		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteByte('}')
 		} else {
 			p.buf.WriteByte(']')
 		}
 	case reflect.Struct:
-		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
-		p.newLineIfRequire(depth)
 		p.buf.WriteByte('}')
 	case reflect.Slice, reflect.Array:
-		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
-		if lines > 0 {
-			p.newLineIfRequire(depth)
-		}
 		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteByte('}')
 		} else {
@@ -821,19 +805,6 @@ func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
 	default:
 		//it will never happen except error inner usage, so use panic
 		panic("unknown value set:" + kind.String())
-	}
-}
-
-// truncate last element separator
-func (p *pp) truncateLastElemSeparator(numElem, lines int) {
-	if numElem > 0 {
-		if lines == 0 || !p.extendVflagOnly() {
-			if p.fmt.sharpV || p.fmt.sharpsharpV {
-				p.buf.TruncateTail(2) //remove last commaSpaceString
-			} else {
-				p.buf.TruncateTail(1) //remove last ' '
-			}
-		}
 	}
 }
 
@@ -883,25 +854,27 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			return
 		}
 		keys := f.MapKeys()
-		for _, key := range keys {
-			p.newLineIfRequire(depth + 1)
+		last := len(keys) - 1
+		p.newLineIfRequire(depth+1, last < 0)
+		for i, key := range keys {
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
 			if p.extendVflagOnly() {
 				p.buf.WriteByte(' ')
 			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
-			p.writeElemSeparator() // commaSpaceString or ' '
+			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' '
 		}
-		p.writeValueSetTail(f.Kind(), len(keys), len(keys), depth)
+		p.writeValueSetTail(f.Kind())
 
 	case reflect.Struct:
 		if !p.writeValueSetHead(f) {
 			return
 		}
+
 		numField := f.NumField()
-		for i := 0; i < numField; i++ {
-			p.newLineIfRequire(depth + 1)
+		p.newLineIfRequire(depth+1, numField == 0)
+		for i, last := 0, numField-1; i < numField; i++ {
 			if p.fmt.plusV || p.fmt.sharpV || p.fmt.plusplusV || p.fmt.sharpsharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
@@ -912,39 +885,28 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				}
 			}
 			p.printValue(getField(f, i), verb, depth+1)
-			p.writeElemSeparator() // commaSpaceString or ' '
+			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' '
 		}
-		p.writeValueSetTail(f.Kind(), numField, numField, depth)
+		p.writeValueSetTail(f.Kind())
 
-	case reflect.Interface:
-		value := f.Elem()
-		if !value.IsValid() {
-			if p.fmt.sharpV || p.fmt.sharpsharpV {
-				p.buf.WriteString(f.Type().String())
-				p.buf.WriteString(nilParenString)
-			} else {
-				p.buf.WriteString(nilAngleString)
-			}
-		} else {
-			p.printValue(value, verb, depth+1)
-		}
 	case reflect.Array, reflect.Slice:
 		switch verb {
 		case 'v':
 			if !p.writeValueSetHead(f) {
 				return
 			}
-			lines, size := 0, f.Len()
-			elemKind := f.Type().Elem().Kind()
-			for i := 0; i < size; i++ {
-				if p.arrayRequireNewLine(elemKind, i, size) {
-					lines++
-					p.newLineIfRequire(depth + 1)
-				}
-				p.printValue(f.Index(i), verb, depth+1)
-				p.writeElemSeparator() // commaSpaceString or ' '
+			lines, size, elemKind := 0, f.Len(), f.Type().Elem().Kind()
+			if p.arrayRequireNewLine(elemKind, 0, size) {
+				lines++
+				p.newLineIfRequire(depth+1, size == 0)
 			}
-			p.writeValueSetTail(f.Kind(), size, lines, depth)
+			for i, last := 0, size-1; i < size; i++ {
+				p.printValue(f.Index(i), verb, depth+1)
+				isLast := i == last
+				newLine := lines > 0 && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
+				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' '
+			}
+			p.writeValueSetTail(f.Kind())
 
 		case 's', 'q', 'x', 'X':
 			// Handle byte and uint8 slices and arrays special for the above verbs.
@@ -979,6 +941,18 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.buf.WriteByte(']')
 		}
 
+	case reflect.Interface:
+		value := f.Elem()
+		if !value.IsValid() {
+			if p.fmt.sharpV || p.fmt.sharpsharpV {
+				p.buf.WriteString(f.Type().String())
+				p.buf.WriteString(nilParenString)
+			} else {
+				p.buf.WriteString(nilAngleString)
+			}
+		} else {
+			p.printValue(value, verb, depth+1)
+		}
 	case reflect.Ptr:
 		// pointer to array or slice or struct? ok at top level
 		// but not embedded (avoid loops)
