@@ -28,7 +28,7 @@ func ExampleStringer() {
 	// Output: Gopher (2)
 }
 
-func ExamplePrintf_Vflag() {
+func ExamplePrintf_vFlag() {
 	type X struct {
 		A int
 		B string

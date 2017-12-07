@@ -774,7 +774,9 @@ func (p *pp) writeValueSetHead(v reflect.Value) bool {
 			p.buf.WriteByte('[')
 		}
 	default:
-		panic("error")
+		p.buf.WriteString("(?unknown value set head:")
+		p.buf.WriteString(kind.String())
+		p.buf.WriteString(")")
 	}
 	return true
 }
@@ -814,7 +816,9 @@ func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
 			p.buf.WriteByte(']')
 		}
 	default:
-		panic("error")
+		p.buf.WriteString("(?unknown value set tail:")
+		p.buf.WriteString(kind.String())
+		p.buf.WriteString(")")
 	}
 }
 
