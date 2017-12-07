@@ -388,8 +388,12 @@ type Package struct {
 	Name          string // package name
 	ImportComment string // path in import comment on package statement
 
-	LocalRoot    string //Ally: root of local project(which contains sub-directory "vendor")
-	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference
+	FmtImportPath string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
+	LocalRoot     string      // LocalRoot of imported package
+	Signature     string      // Signature of imported package, which is unique for every package Dir
+	Type          PackageType // Type of formated ImportPath
+	Style         ImportStyle // Style of formated ImportPath
+	IsVendor      bool        // From vendor path
 
 	Doc           string   // documentation synopsis
 	ImportPath    string   // import path of package ("" if unknown)
@@ -503,296 +507,25 @@ func nameExt(name string) string {
 //
 func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Package, error) {
 	//fmt.Printf("Context.Import path=[%s] srcDir=[%s] mode=%d\n", path, srcDir, mode)
-	p := &Package{
-		ImportPath: GetLocalRootRelatedImportPath(path), //Ally: conver #/x/y/z to x/y/z
-	}
-	if path == "" {
-		return p, fmt.Errorf("import %q: invalid import path", path)
-	}
-	if path[0] == '/' {
-		return p, fmt.Errorf("import %q: cannot import absolute path", path)
-	}
-	//never use relative path like ./xxx or ../xxx, use #/xxx insdead
-	//	if path[0] == '.' {
-	//		return p, fmt.Errorf("import %q: cannot import relative path, use #/xxx refering local packages", path)
-	//	}
 
-	var pkgtargetroot string
-	var pkga string
-	var pkgerr error
-	suffix := ""
-	if ctxt.InstallSuffix != "" {
-		suffix = "_" + ctxt.InstallSuffix
-	}
-	switch ctxt.Compiler {
-	case "gccgo":
-		pkgtargetroot = "pkg/gccgo_" + ctxt.GOOS + "_" + ctxt.GOARCH + suffix
-	case "gc":
-		pkgtargetroot = "pkg/" + ctxt.GOOS + "_" + ctxt.GOARCH + suffix
-	default:
-		// Save error for end of function.
-		pkgerr = fmt.Errorf("import %q: unknown compiler %q", path, ctxt.Compiler)
-	}
-	setPkga := func() {
-		switch ctxt.Compiler {
-		case "gccgo":
-			dir, elem := pathpkg.Split(p.ImportPath)
-			pkga = pkgtargetroot + "/" + dir + "lib" + elem + ".a"
-		case "gc":
-			pkga = pkgtargetroot + "/" + p.ImportPath + ".a"
-		}
-	}
-	setPkga()
+	p := &Package{}
 
-	binaryOnly := false
-
-	searchLocalRoot := func() string {
-		if p.LocalRoot == "" {
-			p.LocalRoot = ctxt.SearchLocalRoot(srcDir)
-		}
-		return p.LocalRoot
+	var packagePath PackagePath
+	if err := packagePath.FindImport(ctxt, path, srcDir, mode); err != nil {
+		p.copyFromPackagePath(ctxt, &packagePath) //ignore copy errors
+		return p, err
 	}
 
-	//Ally: import local package by "#/xxx" style
-	referedByLocalStyle := IsLocalRootBasedImport(path)
-	if referedByLocalStyle {
-		if srcDir == "" {
-			return p, fmt.Errorf("import %q: import local package to unknown directory %s", path, srcDir)
-		}
-
-		if searchLocalRoot() == "" {
-			return p, fmt.Errorf(`import %q: cannot find local root(with sub tree "<root>/src/vendor") up from %s`, path, srcDir)
-		}
-		p.ImportPath = path[2:]
-		p.Dir = ctxt.joinPath(p.LocalRoot, "src", p.ImportPath)
-		p.Root = p.LocalRoot
-
-		if ctxt.isDir(p.Dir) {
-			goto Found
-		}
-
-		//local vendor
-		if mode&IgnoreVendor == 0 && srcDir != "" {
-			if vendor := ctxt.joinPath(p.LocalRoot, "src", "vendor", p.ImportPath); ctxt.isDir(p.Dir) {
-				p.Dir = vendor
-				goto Found
-			}
-		}
-
-		return p, fmt.Errorf("import %q: cannot find package from %s", path, p.LocalRoot)
-	} //if referedByLocalStyle
-
-	if IsLocalImport(path) {
-		pkga = "" // local imports have no installed path
-		if srcDir == "" {
-			return p, fmt.Errorf("import %q: import relative to unknown directory", path)
-		}
-		if !ctxt.isAbsPath(path) {
-			p.Dir = ctxt.joinPath(srcDir, path)
-		}
-
-		//		// p.Dir directory may or may not exist. Gather partial information first, check if it exists later.
-		//		// Determine canonical import path, if any.
-		//		// Exclude results where the import path would include /testdata/.
-		//		inTestdata := func(sub string) bool {
-		//			return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
-		//		}
-
-		//Ally: find if this path is in a local root
-		if searchLocalRoot() != "" {
-			p.SrcRoot = ctxt.joinPath(p.LocalRoot, "src")
-			if sub, ok := ctxt.hasSubdir(p.SrcRoot, p.Dir); ok && !inTestdata(sub) {
-				p.ImportPath = sub
-				p.Root = p.LocalRoot
-				setPkga() // p.ImportPath changed
-				goto Found
-			}
-		}
-
-		if ctxt.GOROOT != "" {
-			root := ctxt.joinPath(ctxt.GOROOT, "src")
-			if sub, ok := ctxt.hasSubdir(root, p.Dir); ok && !inTestdata(sub) {
-				p.Goroot = true
-				p.ImportPath = sub
-				p.Root = ctxt.GOROOT
-				setPkga() // p.ImportPath changed
-				goto Found
-			}
-		}
-		all := ctxt.gopath()
-		for i, root := range all {
-			rootsrc := ctxt.joinPath(root, "src")
-			if sub, ok := ctxt.hasSubdir(rootsrc, p.Dir); ok && !inTestdata(sub) {
-				// We found a potential import path for dir,
-				// but check that using it wouldn't find something
-				// else first.
-
-				// Fix #22863: main package in GoPath/src/ runs "go install" fail.
-				// see: https://github.com/golang/go/issues/22863
-				// When srcDir="GoPath/src", sub=".", it will always conflict but not expected.
-				if sub != "." && sub != "" {
-					if ctxt.GOROOT != "" {
-						if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
-							p.ConflictDir = dir
-							goto Found
-						}
-					}
-					for _, earlyRoot := range all[:i] {
-						if dir := ctxt.joinPath(earlyRoot, "src", sub); ctxt.isDir(dir) {
-							p.ConflictDir = dir
-							goto Found
-						}
-					}
-				}
-
-				// sub would not name some other directory instead of this one.
-				// Record it.
-				p.ImportPath = sub
-				p.Root = root
-				setPkga() // p.ImportPath changed
-				goto Found
-			}
-		}
-		// It's okay that we didn't find a root containing dir.
-		// Keep going with the information we have.
-	} else {
-		if strings.HasPrefix(path, "/") {
-			return p, fmt.Errorf("import %q: cannot import absolute path", path)
-		}
-
-		// tried records the location of unsuccessful package lookups
-		var tried struct {
-			vendor []string
-			goroot string
-			gopath []string
-		}
-		gopath := ctxt.gopath()
-
-		// Vendor directories get first chance to satisfy import.
-		if mode&IgnoreVendor == 0 && srcDir != "" {
-			searchVendor := func(root string, isGoroot bool) bool {
-				sub, ok := ctxt.hasSubdir(root, srcDir)
-				if !ok || !strings.HasPrefix(sub, "src/") || strings.Contains(sub, "/testdata/") {
-					return false
-				}
-				for {
-					vendor := ctxt.joinPath(root, sub, "vendor")
-					if ctxt.isDir(vendor) {
-						dir := ctxt.joinPath(vendor, path)
-						if ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
-							p.Dir = dir
-							p.ImportPath = strings.TrimPrefix(pathpkg.Join(sub, "vendor", path), "src/")
-							p.Goroot = isGoroot
-							p.Root = root
-							setPkga() // p.ImportPath changed
-							return true
-						}
-						tried.vendor = append(tried.vendor, dir)
-					}
-					i := strings.LastIndex(sub, "/")
-					if i < 0 {
-						break
-					}
-					sub = sub[:i]
-				}
-				return false
-			}
-			//search local vendor first
-			if localRoot := ctxt.SearchLocalRoot(srcDir); localRoot != "" {
-				if searchVendor(localRoot, false) {
-					p.Root = localRoot
-					goto Found
-				}
-			}
-			if searchVendor(ctxt.GOROOT, true) {
-				goto Found
-			}
-			for _, root := range gopath {
-				if searchVendor(root, false) {
-					goto Found
-				}
-			}
-		}
-
-		// Determine directory from import path.
-		if ctxt.GOROOT != "" {
-			dir := ctxt.joinPath(ctxt.GOROOT, "src", path)
-			isDir := ctxt.isDir(dir)
-			binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(ctxt.GOROOT, pkga))
-			if isDir || binaryOnly {
-				p.Dir = dir
-				p.Goroot = true
-				p.Root = ctxt.GOROOT
-				goto Found
-			}
-			tried.goroot = dir
-		}
-		for _, root := range gopath {
-			dir := ctxt.joinPath(root, "src", path)
-			isDir := ctxt.isDir(dir)
-			binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(root, pkga))
-			if isDir || binaryOnly {
-				p.Dir = dir
-				p.Root = root
-				goto Found
-			}
-			tried.gopath = append(tried.gopath, dir)
-		}
-		//Ally: search local root
-		if localRoot := searchLocalRoot(); localRoot != "" {
-			dir := ctxt.joinPath(localRoot, "src", path)
-			isDir := ctxt.isDir(dir)
-			binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(localRoot, pkga))
-			if isDir || binaryOnly {
-				p.Dir = dir
-				p.Root = localRoot
-				goto Found
-			}
-			tried.gopath = append(tried.gopath, dir)
-		}
-
-		// package was not found
-		var paths []string
-		format := "\t%s (vendor tree)"
-		for _, dir := range tried.vendor {
-			paths = append(paths, fmt.Sprintf(format, dir))
-			format = "\t%s"
-		}
-		if tried.goroot != "" {
-			paths = append(paths, fmt.Sprintf("\t%s (from $GOROOT)", tried.goroot))
-		} else {
-			paths = append(paths, "\t($GOROOT not set)")
-		}
-		format = "\t%s (from $GOPATH)"
-		for _, dir := range tried.gopath {
-			paths = append(paths, fmt.Sprintf(format, dir))
-			format = "\t%s"
-		}
-		if len(tried.gopath) == 0 {
-			paths = append(paths, "\t($GOPATH not set. For more details see: 'go help gopath')")
-		}
-
-		return p, fmt.Errorf("cannot find package %q in any of:\n%s", path, strings.Join(paths, "\n"))
-	}
-
-Found:
-
-	// If it's a local import path, by the time we get here, we still haven't checked
-	// that p.Dir directory exists. This is the right time to do that check.
-	// We can't do it earlier, because we want to gather partial information for the
-	// non-nil *Package returned when an error occurs.
-	// We need to do this before we return early on FindOnly flag.
-	if IsLocalImport(path) && !ctxt.isDir(p.Dir) {
-		// package was not found
-		return p, fmt.Errorf("cannot find package %q in:\n\t%s", path, p.Dir)
+	if err := p.copyFromPackagePath(ctxt, &packagePath); err != nil {
+		return p, err
 	}
 
 	if mode&FindOnly != 0 {
-		return p, pkgerr
+		return p, nil
 	}
-	if binaryOnly && (mode&AllowBinary) != 0 {
-		return p, pkgerr
-	}
+	//	if binaryOnly && (mode&AllowBinary) != 0 {
+	//		return p, nil
+	//	}
 
 	dirs, err := ctxt.readDir(p.Dir)
 	if err != nil {
@@ -912,21 +645,9 @@ Found:
 				if err != nil {
 					badFile(fmt.Errorf("%s:%d: cannot parse import comment", filename, line))
 				} else if p.ImportComment == "" {
-					if com == "#" { //Ally: package comment with "#" means that this a local-package
-						p.LocalPackage = true
-						searchLocalRoot()
-						// error: reference local package from global style
-						// Refer from self path is valid.
-						//						if !referedByLocalStyle && p.Dir != srcDir {
-						//							badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
-						//						}
-						//p.ImportComment = com
-						firstCommentFile = name
-					} else {
-						p.ImportComment = com
-						firstCommentFile = name
-					}
-				} else if p.ImportComment != com || p.LocalPackage {
+					p.ImportComment = com
+					firstCommentFile = name
+				} else if p.ImportComment != com {
 					badFile(fmt.Errorf("found import comments %q (%s) and %q (%s) in %s", p.ImportComment, firstCommentFile, com, name, p.Dir))
 				}
 			}
@@ -948,17 +669,6 @@ Found:
 				importedPath, err := strconv.Unquote(quoted)
 				if err != nil {
 					log.Panicf("%s: parser returned invalid quoted string: <%s>", filename, quoted)
-				}
-
-				//Ally: import local package by "#/xxx" style
-				if localStyle := IsLocalRootBasedImport(importedPath); localStyle { //has local refered packages
-					p.LocalPackage = true
-					searchLocalRoot()
-					// error: reference local package from global style
-					// Refer from self path is valid.
-					//					if !referedByLocalStyle && p.Dir != srcDir {
-					//						badFile(fmt.Errorf("cannot import local-package %s from global style", p.Dir))
-					//					}
 				}
 
 				if isXTest {
@@ -1025,35 +735,10 @@ Found:
 		sort.Strings(p.SFiles)
 	}
 
-	//Ally: local main package may refered by global-style
-	//update path info first
-	if p.LocalPackage {
-		localRoot := searchLocalRoot()
-		if localRoot == "" {
-			return p, fmt.Errorf(`import %q: cannot find local root(with sub-tree "<root>/src/vendor") up from %s`, path, srcDir)
-		}
-
-		p.Root = localRoot
-		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-		if sub, ok := ctxt.hasSubdir(p.SrcRoot, p.Dir); ok {
-			p.ImportPath = sub
-		}
-	}
-
-	if p.Root != "" {
-		p.SrcRoot = ctxt.joinPath(p.Root, "src")
-		p.PkgRoot = ctxt.joinPath(p.Root, "pkg")
-		p.BinDir = ctxt.joinPath(p.Root, "bin")
-		if pkga != "" {
-			p.PkgTargetRoot = ctxt.joinPath(p.Root, pkgtargetroot)
-			p.PkgObj = ctxt.joinPath(p.Root, pkga)
-		}
-	}
-
 	//Ally debug:
 	//fmt.Printf("Import %s %s \nDir=%s\nImportPath=%s \nBinDir=%s \nRoot=%s \nLocal=%v %s err=%v\nConflictDir=%s\n", path, srcDir, p.Dir, p.ImportPath, p.BinDir, p.Root, p.LocalPackage, p.LocalRoot, badGoError, p.ConflictDir)
 
-	return p, pkgerr
+	return p, nil
 }
 
 // hasGoFiles reports whether dir contains any files with names ending in .go.

@@ -109,15 +109,17 @@ type FormatImport struct {
 
 // PackagePath represent path information of a package
 type PackagePath struct {
+	ImporterDir string // dir of importer
+
+	ImportPath  string // Regular import path related to Root, full path like "c:\x\y\z" for standalone packages
+	Dir         string // Dir of imported package
+	Root        string // Root of imported package
+	ConflictDir string // this directory shadows Dir in $GOPATH/$GoPath
+
 	OriginImportPath string      // original import path. like: "." "./../xx" "#/xx" "xx"
-	ImporterDir      string      // dir of importer
 	FmtImportPath    string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
-	ImportPath       string      // Regular import path related to Root, full path like "c:\x\y\z" for standalone packages
-	Signature        string      // Signature of imported package, which is unique for every package Dir
-	Dir              string      // Dir of imported package
 	LocalRoot        string      // LocalRoot of imported package
-	ConflictDir      string      // this directory shadows Dir in $GOPATH/$GoPath
-	Root             string      // Root of imported package
+	Signature        string      // Signature of imported package, which is unique for every package Dir
 	Type             PackageType // Type of formated ImportPath
 	Style            ImportStyle // Style of formated ImportPath
 	IsVendor         bool        // From vendor path
@@ -402,10 +404,12 @@ func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 	p.LocalRoot = pp.LocalRoot
 	p.Root = pp.Root
 	p.ConflictDir = pp.ConflictDir
-	//	p.Signature = pp.Signature
-	//	p.IsVendor = pp.IsVendor
-	//	p.ImportPath = pp.ImportPath
-	//	p.Type = pp.Type
+
+	p.FmtImportPath = pp.FmtImportPath
+	p.Signature = pp.Signature
+	p.IsVendor = pp.IsVendor
+	p.Type = pp.Type
+	p.Style = pp.Style
 
 	var pkgtargetroot string
 	var pkga string
