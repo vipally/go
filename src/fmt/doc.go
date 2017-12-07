@@ -16,9 +16,9 @@
 		%v		the value in a default format
 				when printing structs, the plus flag (%+v) adds field names
 		%#v		a Go-syntax representation of the value
-		%##v	a indented-multi-lines style Go-syntax representation of the value(%#v).
+		%##v	a indented-multi-lines style Go-syntax representation of the value(extends %#v).
 		%+v		when printing structs, the plus flag (%+v) adds field names.
-		%++v	a indented-multi-lines style struct representation of the value(%+v).
+		%++v	a indented-multi-lines style struct representation of the value(extends %+v).
 		%T		a Go-syntax representation of the type of the value
 		%%		a literal percent sign; consumes no value
 

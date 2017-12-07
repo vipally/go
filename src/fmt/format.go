@@ -35,11 +35,11 @@ type fmtFlags struct {
 	plusV  bool
 	sharpV bool
 
-	// use "%##v" to format a value with indented-multi-line style "%#v" string
+	// use "%##v" to format a value with indented-multi-lines style string to extends "%#v"
 	sharpsharp  bool //"##" found
 	sharpsharpV bool //"%##v"
 
-	// use "%++v" to format a value with indented-multi-line style "%+v" string
+	// use "%++v" to format a value with indented-multi-lines style string to extends "%+v"
 	plusplus  bool //"++" found
 	plusplusV bool //"%++v"
 }

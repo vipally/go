@@ -744,15 +744,18 @@ func (p *pp) extendVflagOnly() bool {
 	return p.fmt.extendVflagOnly()
 }
 
+// write head of a value set(struct, map, slice, array).
+// If v is a nil map/slice, it will return false.
+// Which means the hole data set is finish.
 func (p *pp) writeValueSetHead(v reflect.Value) bool {
 	switch kind := v.Kind(); kind {
 	case reflect.Struct:
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteString(v.Type().String())
 		}
 		p.buf.WriteByte('{')
 	case reflect.Map:
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteString(v.Type().String())
 			if v.IsNil() {
 				p.buf.WriteString(nilParenString)
@@ -774,29 +777,29 @@ func (p *pp) writeValueSetHead(v reflect.Value) bool {
 			p.buf.WriteByte('[')
 		}
 	default:
-		p.buf.WriteString("(?unknown value set head:")
-		p.buf.WriteString(kind.String())
-		p.buf.WriteString(")")
+		//it will never happen except error inner usage, so use panic
+		panic("unknown value set:" + kind.String())
 	}
 	return true
 }
 
-// write element separator
+// write element separator in value sets(struct, map, slice, array).
 func (p *pp) writeElemSeparator() {
 	switch {
-	case p.fmt.sharpV:
+	case p.fmt.sharpV || p.fmt.sharpsharpV:
 		p.buf.WriteString(commaSpaceString)
 	default:
 		p.buf.WriteByte(' ')
 	}
 }
 
+// write tail of a value set(struct, map, slice, array)
 func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
 	switch kind {
 	case reflect.Map:
 		p.truncateLastElemSeparator(size, lines) //remove last commaSpaceString or ' '
 		p.newLineIfRequire(depth)
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteByte('}')
 		} else {
 			p.buf.WriteByte(']')
@@ -810,15 +813,14 @@ func (p *pp) writeValueSetTail(kind reflect.Kind, size, lines, depth int) {
 		if lines > 0 {
 			p.newLineIfRequire(depth)
 		}
-		if p.fmt.sharpV {
+		if p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteByte('}')
 		} else {
 			p.buf.WriteByte(']')
 		}
 	default:
-		p.buf.WriteString("(?unknown value set tail:")
-		p.buf.WriteString(kind.String())
-		p.buf.WriteString(")")
+		//it will never happen except error inner usage, so use panic
+		panic("unknown value set:" + kind.String())
 	}
 }
 
@@ -900,7 +902,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 		numField := f.NumField()
 		for i := 0; i < numField; i++ {
 			p.newLineIfRequire(depth + 1)
-			if p.fmt.plusV || p.fmt.sharpV {
+			if p.fmt.plusV || p.fmt.sharpV || p.fmt.plusplusV || p.fmt.sharpsharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
@@ -917,7 +919,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 	case reflect.Interface:
 		value := f.Elem()
 		if !value.IsValid() {
-			if p.fmt.sharpV {
+			if p.fmt.sharpV || p.fmt.sharpsharpV {
 				p.buf.WriteString(f.Type().String())
 				p.buf.WriteString(nilParenString)
 			} else {
@@ -966,7 +968,6 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				return
 			}
 			fallthrough
-
 		default:
 			p.buf.WriteByte('[')
 			for i := 0; i < f.Len(); i++ {
