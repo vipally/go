@@ -149,7 +149,7 @@ func TestFormatImportPath(t *testing.T) {
 	for i, testCase := range testCases {
 		dir := vdir(testCase.dir)
 		formated, err := testContext.FormatImportPath(testCase.imported, dir)
-		if false { //genCase
+		if genCase := false; genCase { //genCase
 			if err != nil {
 				fmt.Printf("&_Case{%d, `%s`, `%s`, fmt.Errorf(`%s`),&_Want{}},\n", i+1, testCase.imported, testCase.dir, err.Error())
 			} else {
@@ -242,7 +242,7 @@ func TestFindImport(t *testing.T) {
 		dir := vdir(testCase.dir)
 		err := pp.FindImport(&testContext, testCase.imported, dir, testCase.mode)
 
-		if false { //genCase
+		if genCase := false; genCase { //genCase
 			if err != nil {
 				fmt.Printf("&_Case{%d, `%s`, `%s`, %d, fmt.Errorf(`%s`),&_Want{}},\n", i+1, testCase.imported, testCase.dir, testCase.mode, err.Error())
 			} else {

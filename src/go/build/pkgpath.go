@@ -16,6 +16,11 @@ import (
 	"unicode"
 )
 
+const (
+	// illegal chars in import path
+	illegalImportChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+)
+
 var (
 	wd        = getwd()                                 // current working dir
 	goRootSrc = Default.joinPath(Default.GOROOT, "src") // GoRoot/src
@@ -192,7 +197,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 
 // findGlobalRoot find root form GoRoot/GoPath for fullDir
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
-	findRootSrc := ""
+	foundRootSrc := ""
 	for _, rootsrc := range gblSrcs {
 		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok /*&& !inTestdata(sub)*/ {
 			fi.FmtImportPath = sub
@@ -203,15 +208,15 @@ func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 			} else {
 				fi.Type = PackageGoPath
 			}
-			findRootSrc = rootsrc
+			foundRootSrc = rootsrc
 			break
 		}
 	}
 
-	found := findRootSrc != ""
+	found := foundRootSrc != ""
 	if found { //check if conflict
 		for _, rootsrc := range gblSrcs {
-			if rootsrc != findRootSrc {
+			if rootsrc != foundRootSrc {
 				if dir := ctxt.joinPath(rootsrc, fi.FmtImportPath); ctxt.isDir(dir) {
 					fi.ConflictDir = dir
 					break
@@ -320,24 +325,24 @@ func GetImportStyle(imported string) (ImportStyle, error) {
 	switch lead := imported[0]; {
 	case lead == '.':
 		if len(imported) == 1 {
-			return ImportStyleSelf, nil
+			return ImportStyleSelf, nil //"."
 		} else {
 			second := imported[1]
 			switch second {
 			case '/':
-				return ImportStyleRelated, nil
+				return ImportStyleRelated, nil //"./xxx"
 			case '.':
 				if len(imported) == 2 || imported[2] == '/' {
-					return ImportStyleRelated, nil
+					return ImportStyleRelated, nil //".." "../xxx"
 				}
 			}
 		}
 	case lead == '#':
-		if imported == "#" || strings.HasPrefix(imported, "#/") {
-			return ImportStyleLocalRoot, nil
+		if len(imported) == 1 || imported[1] == '/' {
+			return ImportStyleLocalRoot, nil //"#" "#/xxx"
 		}
 	default:
-		return ImportStyleGlobal, nil
+		return ImportStyleGlobal, nil //"x/y/z"
 	}
 
 	return ImportStyleUnknown, fmt.Errorf("import %q: invalid import path", imported)
@@ -715,8 +720,7 @@ func dirToImportPath(dir string) string {
 
 func makeImportValid(r rune) rune {
 	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
 		return '_'
 	}
 	return r
@@ -779,9 +783,8 @@ func IsValidImportPath(imported string) bool {
 		sCheck = sCheck[1:]
 	}
 
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
 	for _, r := range sCheck {
-		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
 			return false
 		}
 	}
@@ -813,9 +816,8 @@ func ValidateImportPath(imported string) error {
 		sCheck = sCheck[1:]
 	}
 
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
 	for _, r := range sCheck {
-		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
 			return fmt.Errorf("import %q: invalid character %#U", imported, r)
 		}
 	}
