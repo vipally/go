@@ -34,6 +34,14 @@ type fmtFlags struct {
 	// different, flagless formats set at the top level.
 	plusV  bool
 	sharpV bool
+
+	// use "%##v" to format a value with indented-multi-lines style string to extends "%#v"
+	sharpsharp  bool //"##" found
+	sharpsharpV bool //"%##v"
+
+	// use "%++v" to format a value with indented-multi-lines style string to extends "%+v"
+	plusplus  bool //"++" found
+	plusplusV bool //"%++v"
 }
 
 // A fmt is the raw formatter used by Printf etc.
@@ -404,12 +412,18 @@ func (f *fmt) fmt_bx(b []byte, digits string) {
 	f.fmt_sbx("", b, digits)
 }
 
+// "%##v" "%++v" only ("%#v" "%+v" optional)
+func (f *fmt) extendVflagOnly() bool {
+	// do not effect exists "%#v" "%+v", so do not include sharpV and plusV
+	return f.sharpsharpV || f.plusplusV //|| f.sharpV || f.plusV
+}
+
 // fmt_q formats a string as a double-quoted, escaped Go string constant.
 // If f.sharp is set a raw (backquoted) string may be returned instead
 // if the string does not contain any control characters other than tab.
 func (f *fmt) fmt_q(s string) {
 	s = f.truncate(s)
-	if f.sharp && strconv.CanBackquote(s) {
+	if (f.extendVflagOnly() || f.sharp) && strconv.CanBackquote(s) {
 		f.padString("`" + s + "`")
 		return
 	}
