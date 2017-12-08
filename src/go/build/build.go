@@ -384,17 +384,16 @@ const (
 
 // A Package describes the Go package found in a directory.
 type Package struct {
-	Dir           string // directory containing package sources
-	Name          string // package name
-	ImportComment string // path in import comment on package statement
-
 	FmtImportPath string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
 	LocalRoot     string      // LocalRoot of imported package
 	Signature     string      // Signature of imported package, which is unique for every package Dir
-	Type          PackageType // Type of formated ImportPath
-	Style         ImportStyle // Style of formated ImportPath
+	Type          PackageType // Type of FmtImportPath
+	Style         ImportStyle // import Style of FmtImportPath
 	IsVendor      bool        // From vendor path
 
+	Dir           string   // directory containing package sources
+	Name          string   // package name
+	ImportComment string   // path in import comment on package statement
 	Doc           string   // documentation synopsis
 	ImportPath    string   // import path of package ("" if unknown)
 	Root          string   // root of Go tree where this package lives

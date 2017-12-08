@@ -453,16 +453,23 @@ func (p *PackagePath) copyFromFormatImport(fmted *FormatImport) {
 	p.ImportPath = p.Style.RealImportPath(p.FmtImportPath)
 }
 
-func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode ImportMode) error {
+//format import path, and copy the info
+func (p *PackagePath) formatImportAndCopy(ctxt *Context, imported, srcDir string) (bool, error) {
 	var fmted FormatImport
-	if err := fmted.FormatImportPath(ctxt, imported, srcDir); err != nil {
+	err := fmted.FormatImportPath(ctxt, imported, srcDir)
+	p.copyFromFormatImport(&fmted)
+	return fmted.Formated, err
+}
+
+func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode ImportMode) (err error) {
+
+	formated := false
+	if formated, err = p.formatImportAndCopy(ctxt, imported, srcDir); err != nil {
 		return err
 	}
 
-	p.copyFromFormatImport(&fmted)
-
-	if !fmted.Formated { //not import "./../foo" style
-		switch style := fmted.Style; {
+	if !formated { //not import "./../foo" style
+		switch style := p.Style; {
 		case style.IsLocalRoot(): //import "#/x/y/z" style
 			localRoot := ctxt.SearchLocalRoot(srcDir)
 			if localRoot == "" {

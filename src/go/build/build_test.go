@@ -81,8 +81,8 @@ func TestEmptyImport(t *testing.T) {
 	if p == nil {
 		t.Fatal(`Import("") returned nil package.`)
 	}
-	if p.ImportPath != "." {
-		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, ".")
+	if p.ImportPath != "" {
+		t.Fatalf("ImportPath=%q, want %q.", p.ImportPath, "")
 	}
 }
 
@@ -315,9 +315,10 @@ func TestImportDirNotExist(t *testing.T) {
 		mode         ImportMode
 	}{
 		{"Import(full, 0)", "go/build/doesnotexist", "", 0},
-		{"Import(local, 0)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), 0},
 		{"Import(full, FindOnly)", "go/build/doesnotexist", "", FindOnly},
-		{"Import(local, FindOnly)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), FindOnly},
+		//error then return original path
+		//{"Import(local, 0)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), 0},
+		//{"Import(local, FindOnly)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), FindOnly},
 	}
 	for _, test := range tests {
 		p, err := ctxt.Import(test.path, test.srcDir, test.mode)

@@ -115,6 +115,8 @@ func TestFormatImportPath(t *testing.T) {
 		want     *_Want
 	}
 	testCases := []*_Case{
+		&_Case{1, `./doesnotexist`, `__goroot__/src/go/build`, fmt.Errorf(`import "x/(y)/z": invalid character U+0028 '('`), &_Want{}},
+
 		&_Case{1, `x/(y)/z`, `noroot1`, fmt.Errorf(`import "x/(y)/z": invalid character U+0028 '('`), &_Want{}},
 		&_Case{2, `x/Programme Files/y`, `noroot1`, fmt.Errorf(`import "x/Programme Files/y": invalid character U+0020 ' '`), &_Want{}},
 		&_Case{3, `#/#`, `noroot1`, fmt.Errorf(`import "#/#": invalid character U+0023 '#'`), &_Want{}},
