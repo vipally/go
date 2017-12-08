@@ -229,39 +229,6 @@ func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	return found
 }
 
-// GetLocalRootRelPath joins localRootPath and rootBasedPath
-// rootBasedPath must format as "#/foo"
-func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
-	if IsLocalRootBasedImport(rootBasedPath) {
-		relPath := GetLocalRootRelatedImportPath(rootBasedPath)
-		return filepath.ToSlash(filepath.Join(localRootPath, relPath))
-	}
-	return rootBasedPath
-}
-
-// GetLocalRootRelatedImportPath conver #/x/y/z to x/y/z
-func GetLocalRootRelatedImportPath(imported string) string {
-	//Ally:import "#/foo" is valid style
-	if len(imported) > 0 && imported[0] == '#' {
-		imported = imported[1:]
-		if len(imported) > 0 && imported[0] == '/' {
-			imported = imported[1:]
-		}
-	}
-	if len(imported) == 0 {
-		imported = "."
-	}
-	return imported
-}
-
-// IsLocalRootBasedImport reports whether the import path is
-// a local root related import path, like "#/foo"
-// "#" will be replaced with which contains sub-directory "vendor" up from current package path.
-func IsLocalRootBasedImport(path string) bool {
-	localStyle := len(path) > 2 && path[:2] == "#/" || path == "#"
-	return localStyle
-}
-
 // ImportStyle represents style of a package import statement
 type ImportStyle uint8
 
@@ -693,6 +660,70 @@ func (p *PackagePath) genSignature() {
 	}
 }
 
+// IsValidImportPath return if a import path is valid, which returns bool
+func IsValidImportPath(imported string) bool {
+	if imported == "" || imported[0] == '/' {
+		return false
+	}
+
+	sCheck := imported
+	for len(sCheck) > 0 && sCheck[0] == '.' { //remove prefix "."
+		sCheck = sCheck[1:]
+	}
+
+	// ".../xxx" ".//xxx" is invalid
+	// "." ".." is valid
+	if len(imported) > len(sCheck)+2 || len(sCheck) > 0 && pathpkg.Clean(sCheck) != sCheck {
+		return false
+	}
+
+	//import "#" "#/foo" is valid style
+	if len(imported) == len(sCheck) && len(sCheck) > 0 && sCheck[0] == '#' {
+		sCheck = sCheck[1:]
+	}
+
+	for _, r := range sCheck {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidateImportPath return if a import path is valid, which returns error
+func ValidateImportPath(imported string) error {
+	if imported == "" {
+		return fmt.Errorf("import %q: invalid import path", imported)
+	}
+	if imported[0] == '/' {
+		return fmt.Errorf("import %q: cannot import absolute path", imported)
+	}
+
+	sCheck := imported
+	for len(sCheck) > 0 && sCheck[0] == '.' { //remove prefix "."
+		sCheck = sCheck[1:]
+	}
+
+	// ".../xxx" ".//xxx" is invalid
+	// "." ".." is valid
+	if len(imported) > len(sCheck)+2 || len(sCheck) > 0 && pathpkg.Clean(sCheck) != sCheck {
+		return fmt.Errorf("import %q: invalid import path", imported)
+	}
+
+	//import "#" "#/foo" is valid style
+	if len(imported) == len(sCheck) && len(sCheck) > 0 && sCheck[0] == '#' {
+		sCheck = sCheck[1:]
+	}
+
+	for _, r := range sCheck {
+		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
+			return fmt.Errorf("import %q: invalid character %#U", imported, r)
+		}
+	}
+
+	return nil
+}
+
 func getwd() string {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -765,66 +796,35 @@ func inTestdata(sub string) bool {
 //	return s, nil
 //}
 
-// IsValidImportPath return if a import path is valid, which returns bool
-func IsValidImportPath(imported string) bool {
-	if imported == "" || imported[0] == '/' {
-		return false
-	}
+//// GetLocalRootRelPath joins localRootPath and rootBasedPath
+//// rootBasedPath must format as "#/foo"
+//func GetLocalRootRelatedPath(localRootPath, rootBasedPath string) string {
+//	if IsLocalRootBasedImport(rootBasedPath) {
+//		relPath := GetLocalRootRelatedImportPath(rootBasedPath)
+//		return filepath.ToSlash(filepath.Join(localRootPath, relPath))
+//	}
+//	return rootBasedPath
+//}
 
-	sCheck := imported
-	for len(sCheck) > 0 && sCheck[0] == '.' { //remove prefix "."
-		sCheck = sCheck[1:]
-	}
+//// GetLocalRootRelatedImportPath conver #/x/y/z to x/y/z
+//func GetLocalRootRelatedImportPath(imported string) string {
+//	//Ally:import "#/foo" is valid style
+//	if len(imported) > 0 && imported[0] == '#' {
+//		imported = imported[1:]
+//		if len(imported) > 0 && imported[0] == '/' {
+//			imported = imported[1:]
+//		}
+//	}
+//	if len(imported) == 0 {
+//		imported = "."
+//	}
+//	return imported
+//}
 
-	// ".../xxx" ".//xxx" is invalid
-	// "." ".." is valid
-	if len(imported) > len(sCheck)+2 || len(sCheck) > 0 && pathpkg.Clean(sCheck) != sCheck {
-		return false
-	}
-
-	//import "#" "#/foo" is valid style
-	if len(imported) == len(sCheck) && len(sCheck) > 0 && sCheck[0] == '#' {
-		sCheck = sCheck[1:]
-	}
-
-	for _, r := range sCheck {
-		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
-			return false
-		}
-	}
-	return true
-}
-
-// ValidateImportPath return if a import path is valid, which returns error
-func ValidateImportPath(imported string) error {
-	if imported == "" {
-		return fmt.Errorf("import %q: invalid import path", imported)
-	}
-	if imported[0] == '/' {
-		return fmt.Errorf("import %q: cannot import absolute path", imported)
-	}
-
-	sCheck := imported
-	for len(sCheck) > 0 && sCheck[0] == '.' { //remove prefix "."
-		sCheck = sCheck[1:]
-	}
-
-	// ".../xxx" ".//xxx" is invalid
-	// "." ".." is valid
-	if len(imported) > len(sCheck)+2 || len(sCheck) > 0 && pathpkg.Clean(sCheck) != sCheck {
-		return fmt.Errorf("import %q: invalid import path", imported)
-	}
-
-	//import "#" "#/foo" is valid style
-	if len(imported) == len(sCheck) && len(sCheck) > 0 && sCheck[0] == '#' {
-		sCheck = sCheck[1:]
-	}
-
-	for _, r := range sCheck {
-		if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalImportChars, r) {
-			return fmt.Errorf("import %q: invalid character %#U", imported, r)
-		}
-	}
-
-	return nil
-}
+//// IsLocalRootBasedImport reports whether the import path is
+//// a local root related import path, like "#/foo"
+//// "#" will be replaced with which contains sub-directory "vendor" up from current package path.
+//func IsLocalRootBasedImport(path string) bool {
+//	localStyle := len(path) > 2 && path[:2] == "#/" || path == "#"
+//	return localStyle
+//}
