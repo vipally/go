@@ -132,12 +132,20 @@ type ResponseWriter interface {
 	// possible to maximize compatibility.
 	Write([]byte) (int, error)
 
-	// WriteHeader sends an HTTP response header with status code.
+	// WriteHeader sends an HTTP response header with the provided
+	// status code.
+	//
 	// If WriteHeader is not called explicitly, the first call to Write
 	// will trigger an implicit WriteHeader(http.StatusOK).
 	// Thus explicit calls to WriteHeader are mainly used to
 	// send error codes.
-	WriteHeader(int)
+	//
+	// The provided code must be a valid HTTP 1xx-5xx status code.
+	// Only one header may be written. Go does not currently
+	// support sending user-defined 1xx informational headers,
+	// with the exception of 100-continue response header that the
+	// Server sends automatically when the Request.Body is read.
+	WriteHeader(statusCode int)
 }
 
 // The Flusher interface is implemented by ResponseWriters that allow
@@ -2778,7 +2786,7 @@ func (srv *Server) Serve(l net.Listener) error {
 // server's certificate, any intermediates, and the CA's certificate.
 //
 // For HTTP/2 support, srv.TLSConfig should be initialized to the
-// provided listener's TLS Config before calling Serve. If
+// provided listener's TLS Config before calling ServeTLS. If
 // srv.TLSConfig is non-nil and doesn't include the string "h2" in
 // Config.NextProtos, HTTP/2 support is not enabled.
 //
@@ -2997,6 +3005,8 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	if err != nil {
 		return err
 	}
+
+	defer ln.Close()
 
 	return srv.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, certFile, keyFile)
 }
