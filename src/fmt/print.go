@@ -736,31 +736,20 @@ func (p *pp) extendVflagOnly() bool {
 // Which means the hole data set is finish.
 func (p *pp) writeValueSetHead(v reflect.Value) bool {
 	switch kind := v.Kind(); kind {
-	case reflect.Struct:
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
+	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
+		if p.fmt.sharpV || p.fmt.sharpsharpV { //write type name
 			p.buf.WriteString(v.Type().String())
-		}
-		p.buf.WriteByte('{')
-	case reflect.Map:
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
-			p.buf.WriteString(v.Type().String())
-			if v.IsNil() {
+			if (kind == reflect.Map || kind == reflect.Slice) && v.IsNil() {
 				p.buf.WriteString(nilParenString)
 				return false
 			}
+		}
+		switch {
+		case kind == reflect.Struct || p.fmt.sharpV || p.fmt.sharpsharpV:
 			p.buf.WriteByte('{')
-		} else {
+		case kind == reflect.Map:
 			p.buf.WriteString(mapString)
-		}
-	case reflect.Slice, reflect.Array:
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
-			p.buf.WriteString(v.Type().String())
-			if kind == reflect.Slice && v.IsNil() {
-				p.buf.WriteString(nilParenString)
-				return false
-			}
-			p.buf.WriteByte('{')
-		} else {
+		default:
 			p.buf.WriteByte('[')
 		}
 	default:
@@ -788,16 +777,8 @@ func (p *pp) writeElemSeparator(newLine, last bool, depth int) {
 // write tail of a value set(struct, map, slice, array)
 func (p *pp) writeValueSetTail(kind reflect.Kind) {
 	switch kind {
-	case reflect.Map:
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
-			p.buf.WriteByte('}')
-		} else {
-			p.buf.WriteByte(']')
-		}
-	case reflect.Struct:
-		p.buf.WriteByte('}')
-	case reflect.Slice, reflect.Array:
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
+	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
+		if kind == reflect.Struct || p.fmt.sharpV || p.fmt.sharpsharpV {
 			p.buf.WriteByte('}')
 		} else {
 			p.buf.WriteByte(']')
@@ -863,7 +844,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				p.buf.WriteByte(' ')
 			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
-			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' '
+			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' ' or newLine
 		}
 		p.writeValueSetTail(f.Kind())
 
@@ -885,7 +866,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				}
 			}
 			p.printValue(getField(f, i), verb, depth+1)
-			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' '
+			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' ' or newLine
 		}
 		p.writeValueSetTail(f.Kind())
 
@@ -904,7 +885,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				p.printValue(f.Index(i), verb, depth+1)
 				isLast := i == last
 				newLine := lines > 0 && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
-				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' '
+				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' ' or newLine
 			}
 			p.writeValueSetTail(f.Kind())
 
