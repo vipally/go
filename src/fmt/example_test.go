@@ -67,7 +67,7 @@ func ExamplePrintf_flagV() {
 	}
 	fmt.Printf("-------\n\"%%v\":\n%v\n", z)
 	fmt.Printf("-------\n\"%%#v\":\n%#v\n", z)
-	fmt.Printf("-------\n\"%%##\"v:\n%##v\n", z)
+	fmt.Printf("-------\n\"%%##v\":\n%##v\n", z)
 	fmt.Printf("-------\n\"%%+v\":\n%+v\n", z)
 	fmt.Printf("-------\n\"%%++v\":\n%++v\n", z)
 
@@ -79,7 +79,7 @@ func ExamplePrintf_flagV() {
 	// "%#v":
 	// fmt_test.Z{G:fmt_test.Y{D:fmt_test.X{A:123, B:"\"b\" = 1"}, E:[]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, F:[2]string{"aaa", "bbb"}}, H:"zzz", I:[]string{"c:\\x\\y\\z", "d:\\a\\b\\c"}, J:map[string]int{"abc":456}}
 	// -------
-	// "%##"v:
+	// "%##v":
 	// fmt_test.Z{
 	//     G: fmt_test.Y{
 	//         D: fmt_test.X{
