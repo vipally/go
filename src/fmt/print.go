@@ -734,7 +734,8 @@ func (p *pp) extendVflagOnly() bool {
 // write head of a value set(struct, map, slice, array).
 // If v is a nil map/slice, it will return false.
 // Which means the hole data set is finish.
-func (p *pp) writeValueSetHead(v reflect.Value) bool {
+// Include the first probably new line.
+func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) bool {
 	switch kind := v.Kind(); kind {
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
 		if p.fmt.sharpV || p.fmt.sharpsharpV { //write type name
@@ -756,6 +757,13 @@ func (p *pp) writeValueSetHead(v reflect.Value) bool {
 		//it will never happen except error inner usage, so use panic
 		panic("unknown value set:" + kind.String())
 	}
+	if newLine {
+		if !empty {
+			depth++ //have element, increase depth
+		}
+		p.newLineIfRequire(depth, empty)
+	}
+
 	return true
 }
 
@@ -831,12 +839,11 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 	case reflect.String:
 		p.fmtString(f.String(), verb)
 	case reflect.Map:
-		if !p.writeValueSetHead(f) {
-			return
-		}
 		keys := f.MapKeys()
 		last := len(keys) - 1
-		p.newLineIfRequire(depth+1, last < 0)
+		if !p.writeValueSetHead(f, true, last < 0, depth) {
+			return
+		}
 		for i, key := range keys {
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
@@ -849,12 +856,10 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 		p.writeValueSetTail(f.Kind())
 
 	case reflect.Struct:
-		if !p.writeValueSetHead(f) {
+		numField := f.NumField()
+		if !p.writeValueSetHead(f, true, numField == 0, depth) {
 			return
 		}
-
-		numField := f.NumField()
-		p.newLineIfRequire(depth+1, numField == 0)
 		for i, last := 0, numField-1; i < numField; i++ {
 			if p.fmt.plusV || p.fmt.sharpV || p.fmt.plusplusV || p.fmt.sharpsharpV {
 				if name := f.Type().Field(i).Name; name != "" {
@@ -873,18 +878,16 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 	case reflect.Array, reflect.Slice:
 		switch verb {
 		case 'v':
-			if !p.writeValueSetHead(f) {
+			size, elemKind := f.Len(), f.Type().Elem().Kind()
+			firstNewLine := p.arrayRequireNewLine(elemKind, 0, size)
+			if !p.writeValueSetHead(f, firstNewLine, size == 0, depth) {
 				return
 			}
-			lines, size, elemKind := 0, f.Len(), f.Type().Elem().Kind()
-			if p.arrayRequireNewLine(elemKind, 0, size) {
-				lines++
-				p.newLineIfRequire(depth+1, size == 0)
-			}
+
 			for i, last := 0, size-1; i < size; i++ {
 				p.printValue(f.Index(i), verb, depth+1)
 				isLast := i == last
-				newLine := lines > 0 && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
+				newLine := firstNewLine && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
 				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' ' or newLine
 			}
 			p.writeValueSetTail(f.Kind())
