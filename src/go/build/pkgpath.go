@@ -255,6 +255,9 @@ func (st ImportStyle) String() string {
 	}
 	return "ImportStyleUnknown"
 }
+func (st ImportStyle) GoString() string {
+	return st.String()
+}
 
 func (st ImportStyle) IsValid() bool     { return st > 0 && st < importStyleEnd }
 func (st ImportStyle) IsSelf() bool      { return st == ImportStyleSelf }
@@ -362,6 +365,10 @@ func (t PackageType) String() string {
 		return "PackageGoPath"
 	}
 	return "PackageUnknown"
+}
+
+func (t PackageType) GoString() string {
+	return t.String()
 }
 
 // copy PackagePath info to Package object

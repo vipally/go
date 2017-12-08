@@ -24,8 +24,9 @@ var (
 	genCase     = true
 )
 
-func init() {
-	//testContext.GOOS = "linux"
+// init test evnironment
+// build a virtual file system
+func TestPkgPathBegin(t *testing.T) {
 	if testContext.GOOS == "windows" {
 		vroot = `v:`
 	}
@@ -350,6 +351,8 @@ func tvdir(s string) string {
 	return "\t" + vdir(s)
 }
 
-func TestEnd(t *testing.T) {
+// uninit test evnironment
+// destroy virtual file system
+func TestPkgPathEnd(t *testing.T) {
 	Default.RefreshEnv()
 }
