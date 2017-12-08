@@ -82,7 +82,7 @@ func TestEmptyImport(t *testing.T) {
 		t.Fatal(`Import("") returned nil package.`)
 	}
 	if p.ImportPath != "." {
-		t.Fatalf("ImportPath=%q, want %q.", p.ImportPath, "")
+		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, ".")
 	}
 }
 
@@ -321,7 +321,7 @@ func TestImportDirNotExist(t *testing.T) {
 	}
 	for _, test := range tests {
 		p, err := ctxt.Import(test.path, test.srcDir, test.mode)
-		if err == nil || !strings.HasPrefix(err.Error(), "cannot find package") {
+		if err == nil || !strings.Contains(err.Error(), "cannot find package") {
 			t.Errorf(`%s got error: %q, want "cannot find package" error`, test.label, err)
 		}
 		// If an error occurs, build.Import is documented to return

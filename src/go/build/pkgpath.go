@@ -156,13 +156,13 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 			fi.Dir = dir
 			fi.Formated = true
 
-			if inTestdata(fi.Dir) {
-				return fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
-			}
+			//			if inTestdata(fi.Dir) {
+			//				return fmt.Errorf("import %q: cannot refer package under testdata %s", imported, fi.Dir)
+			//			}
 
 			if localRoot, localRootSrc := ctxt.searchLocalRoot(dir); localRoot != "" { //from local root
 				//localRootSrc := ctxt.joinPath(localRoot, "src")
-				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ {
+				if sub, ok_ := ctxt.hasSubdir(localRootSrc, dir); ok_ && !inTestdata(sub) {
 					importPath := "#"
 					if sub != "" && sub != "." {
 						importPath = "#/" + sub
@@ -201,7 +201,7 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	foundRootSrc := ""
 	for _, rootsrc := range gblSrcs {
-		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok /*&& !inTestdata(sub)*/ {
+		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok && !inTestdata(sub) {
 			fi.FmtImportPath = sub
 			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
 			fi.Style = ImportStyleGlobal
