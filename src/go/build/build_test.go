@@ -317,8 +317,8 @@ func TestImportDirNotExist(t *testing.T) {
 		{"Import(full, 0)", "go/build/doesnotexist", "", 0},
 		{"Import(full, FindOnly)", "go/build/doesnotexist", "", FindOnly},
 		//error then return original path
-		//{"Import(local, 0)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), 0},
-		//{"Import(local, FindOnly)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), FindOnly},
+		{"Import(local, 0)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), 0},
+		{"Import(local, FindOnly)", "./doesnotexist", filepath.Join(ctxt.GOROOT, "src/go/build"), FindOnly},
 	}
 	for _, test := range tests {
 		p, err := ctxt.Import(test.path, test.srcDir, test.mode)

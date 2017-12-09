@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode"
+	//"unicode"
 
 	"cmd/go/internal/base"
 	"cmd/go/internal/cfg"
@@ -376,6 +376,38 @@ const (
 	GetTestDeps
 )
 
+// GetPkgSignature returns the key of a import path from cache
+// It use a faster way to find the target package path than build.PackagePath.FindImport
+func GetPkgSignature(parent *Package, path, srcDir string, mode int) string {
+	style, _ := build.GetImportStyle(path)
+	pkgSignature := path
+	switch {
+	case style.IsRelated():
+		pkgSignature = build.DirToImportPath(filepath.Join(srcDir, path))
+	case style.IsLocalRoot():
+		localRoot := ""
+		if parent != nil {
+			localRoot = parent.Internal.LocalRoot
+		} else {
+			localRoot = cfg.BuildContext.SearchLocalRoot(srcDir)
+		}
+		pkgSignature = build.DirToImportPath(filepath.Join(localRoot, path))
+	case style.IsGlobal(): //vendor?
+		switch {
+		case DebugDeprecatedImportcfg.enabled:
+			if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
+				//debugDeprecatedImportcfgDir = d
+				pkgSignature = i
+			}
+		case mode&UseVendor != 0:
+			vendor := VendoredImportPath(parent, path)
+			pkgSignature = vendor
+		}
+	default:
+	}
+	return pkgSignature
+}
+
 // LoadImport scans the directory named by path, which must be an import path,
 // but possibly a local import path (an absolute file system path or one beginning
 // with ./ or ../). A local relative path is interpreted relative to srcDir.
@@ -384,9 +416,29 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	stk.Push(path)
 	defer stk.Pop()
 
-	//	var importPath build.PackagePath
-	//	if err := importPath.FindImport(path, srcDir); err != nil {
-	//	}
+	buildMode := build.ImportComment
+	if mode&UseVendor == 0 { // Not vendoring
+		buildMode |= build.IgnoreVendor
+	}
+	var pkgPath build.PackagePath
+	_ = pkgPath.FindImport(&cfg.BuildContext, path, srcDir, buildMode) //ignore error
+
+	// Determine canonical identifier for this package.
+	// For a local import the identifier is the pseudo-import path
+	// we create from the full directory to the package.
+	// Otherwise it is the usual import path.
+	// For vendored imports, it is the expanded form.
+	pkgSignature := pkgPath.Signature
+
+	var debugDeprecatedImportcfgDir string
+	if pkgPath.Type.IsGlobalPackage() {
+		if DebugDeprecatedImportcfg.enabled {
+			if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
+				debugDeprecatedImportcfgDir = d
+				pkgSignature = i
+			}
+		}
+	}
 
 	searchLocalRoot := func() string {
 		localRoot := ""
@@ -398,55 +450,50 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		return localRoot
 	}
 
-	// Determine canonical identifier for this package.
-	// For a local import the identifier is the pseudo-import path
-	// we create from the full directory to the package.
-	// Otherwise it is the usual import path.
-	// For vendored imports, it is the expanded form.
 	importPath := path
 	origPath := path
 	isLocal := build.IsLocalImport(path)
 	localRoot := searchLocalRoot()
 	isLocalRootRelated := localRoot != "" && localRoot != cfg.BuildContext.GOROOT
-	var debugDeprecatedImportcfgDir string
-	if isLocalRootRelated {
-		importPath = build.GetLocalRootRelatedPath(localRoot, path)
-		if importPath == "." {
-			importPath = srcDir
-		}
-		if strings.HasPrefix(importPath, localRoot) {
-			importPath = dirToImportPath(importPath)
-		}
-	} else if isLocal {
-		importPath = dirToImportPath(filepath.Join(srcDir, path))
-	} else if DebugDeprecatedImportcfg.enabled {
-		if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
-			debugDeprecatedImportcfgDir = d
-			importPath = i
-		}
-	} else if mode&UseVendor != 0 {
-		// We do our own vendor resolution, because we want to
-		// find out the key to use in packageCache without the
-		// overhead of repeated calls to buildContext.Import.
-		// The code is also needed in a few other places anyway.
-		path = VendoredImportPath(parent, path)
-		importPath = path
-	}
+
+	//	if isLocalRootRelated {
+	//		importPath = build.GetLocalRootRelatedPath(localRoot, path)
+	//		if importPath == "." {
+	//			importPath = srcDir
+	//		}
+	//		if strings.HasPrefix(importPath, localRoot) {
+	//			importPath = dirToImportPath(importPath)
+	//		}
+	//	} else if isLocal {
+	//		importPath = dirToImportPath(filepath.Join(srcDir, path))
+	//	} else if DebugDeprecatedImportcfg.enabled {
+	//		if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
+	//			debugDeprecatedImportcfgDir = d
+	//			importPath = i
+	//		}
+	//	} else if mode&UseVendor != 0 {
+	//		// We do our own vendor resolution, because we want to
+	//		// find out the key to use in packageCache without the
+	//		// overhead of repeated calls to buildContext.Import.
+	//		// The code is also needed in a few other places anyway.
+	//		path = VendoredImportPath(parent, path)
+	//		importPath = path
+	//	}
 
 	//fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
-	p := packageCache[importPath]
+	p := packageCache[pkgSignature]
 	if p != nil {
 		p = reusePackage(p, stk)
 	} else {
 		p = new(Package)
-		p.Internal.Local = isLocal
+		//p.Internal.Local = isLocal
 		//Ally debug:
 		//fmt.Printf("LoadImport [%s] [%s] \nisLocal=%v  importPath=%s\nparent=%#v\n", path, srcDir, isLocal, importPath, parent)
-		if isLocal || isLocalRootRelated {
-			p.ImportPath = importPath
-		}
+		//		if isLocal || isLocalRootRelated {
+		//			p.ImportPath = importPath
+		//		}
 
-		packageCache[importPath] = p
+		packageCache[pkgSignature] = p
 
 		// Load package.
 		// Import always returns bp != nil, even if an error occurs,
@@ -515,15 +562,6 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		}
 		return setErrorPos(&perr, importPos)
 	}
-
-	//	if p.Internal.LocalPackage && parent != nil && !parent.Internal.LocalPackage {
-	//		perr := *p
-	//		perr.Error = &PackageError{
-	//			ImportStack: stk.Copy(),
-	//			Err:         fmt.Sprintf("import local package %q in non-local package", p.Dir),
-	//		}
-	//		return setErrorPos(&perr, importPos)
-	//	}
 
 	return p
 }
@@ -933,7 +971,7 @@ func (p *Package) load(stk *ImportStack, bp *build.Package, err error) {
 	// The localPrefix is the path we interpret ./ imports relative to.
 	// Synthesized main packages sometimes override this.
 	if p.Internal.Local {
-		p.Internal.LocalPrefix = dirToImportPath(p.Dir)
+		p.Internal.LocalPrefix = build.DirToImportPath(p.Dir)
 	}
 
 	if err != nil {
@@ -1551,7 +1589,7 @@ func GoFilesPackage(gofiles []string) *Package {
 	stk.Push("main")
 	pkg.load(&stk, bp, err)
 	stk.Pop()
-	pkg.Internal.LocalPrefix = dirToImportPath(dir)
+	pkg.Internal.LocalPrefix = build.DirToImportPath(dir)
 	pkg.ImportPath = "command-line-arguments"
 	pkg.Target = ""
 

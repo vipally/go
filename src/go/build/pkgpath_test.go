@@ -105,24 +105,24 @@ func TestFormatImportPath(t *testing.T) {
 		want     *_Want
 	}
 	testCases := []*_Case{
-		&_Case{1, `./doesnotexist`, `__goroot__/src/go/build`, fmt.Errorf(`import "./doesnotexist": cannot find package at v:\__goroot__\src\go\build\doesnotexist`), &_Want{}},
-		&_Case{2, `x/(y)/z`, `noroot1`, fmt.Errorf(`import "x/(y)/z": invalid character U+0028 '('`), &_Want{}},
-		&_Case{3, `x/Programme Files/y`, `noroot1`, fmt.Errorf(`import "x/Programme Files/y": invalid character U+0020 ' '`), &_Want{}},
-		&_Case{4, `#/#`, `noroot1`, fmt.Errorf(`import "#/#": invalid character U+0023 '#'`), &_Want{}},
-		&_Case{5, `##`, `noroot1`, fmt.Errorf(`import "##": invalid character U+0023 '#'`), &_Want{}},
-		&_Case{6, `c:/x/y/z`, `noroot1`, fmt.Errorf(`import "c:/x/y/z": invalid character U+003A ':'`), &_Want{}},
-		&_Case{7, `./#/x/y/z`, `noroot1`, fmt.Errorf(`import "./#/x/y/z": invalid character U+0023 '#'`), &_Want{}},
-		&_Case{8, `x\y\z`, `noroot1`, fmt.Errorf(`import "x\\y\\z": invalid character U+005C '\'`), &_Want{}},
-		&_Case{9, `...`, `noroot1`, fmt.Errorf(`import "...": invalid import path`), &_Want{}},
-		&_Case{10, `#/./x/y/z`, `noroot1`, fmt.Errorf(`import "#/./x/y/z": invalid import path`), &_Want{}},
-		&_Case{11, `.../x/y/z`, `noroot1`, fmt.Errorf(`import ".../x/y/z": invalid import path`), &_Want{}},
-		&_Case{12, ``, `noroot1`, fmt.Errorf(`import "": invalid import path`), &_Want{}},
-		&_Case{13, `.//local1`, `noroot1`, fmt.Errorf(`import ".//local1": invalid import path`), &_Want{}},
-		&_Case{14, `/x/y/z`, `noroot1`, fmt.Errorf(`import "/x/y/z": cannot import absolute path`), &_Want{}},
-		&_Case{15, `//x/y/z`, `noroot1`, fmt.Errorf(`import "//x/y/z": cannot import absolute path`), &_Want{}},
-		&_Case{16, `.`, `notexist`, fmt.Errorf(`import ".": cannot find package at v:\notexist`), &_Want{}},
-		&_Case{17, `.`, `__goroot__/src/notexist`, fmt.Errorf(`import ".": cannot find package at v:\__goroot__\src\notexist`), &_Want{}},
-		&_Case{18, `.`, `gopath1/src/notexist`, fmt.Errorf(`import ".": cannot find package at v:\gopath1\src\notexist`), &_Want{}},
+		&_Case{1, `x/(y)/z`, `noroot1`, fmt.Errorf(`import "x/(y)/z": invalid character U+0028 '('`), &_Want{}},
+		&_Case{2, `x/Programme Files/y`, `noroot1`, fmt.Errorf(`import "x/Programme Files/y": invalid character U+0020 ' '`), &_Want{}},
+		&_Case{3, `#/#`, `noroot1`, fmt.Errorf(`import "#/#": invalid character U+0023 '#'`), &_Want{}},
+		&_Case{4, `##`, `noroot1`, fmt.Errorf(`import "##": invalid character U+0023 '#'`), &_Want{}},
+		&_Case{5, `c:/x/y/z`, `noroot1`, fmt.Errorf(`import "c:/x/y/z": invalid character U+003A ':'`), &_Want{}},
+		&_Case{6, `./#/x/y/z`, `noroot1`, fmt.Errorf(`import "./#/x/y/z": invalid character U+0023 '#'`), &_Want{}},
+		&_Case{7, `x\y\z`, `noroot1`, fmt.Errorf(`import "x\\y\\z": invalid character U+005C '\'`), &_Want{}},
+		&_Case{8, `...`, `noroot1`, fmt.Errorf(`import "...": invalid import path`), &_Want{}},
+		&_Case{9, `#/./x/y/z`, `noroot1`, fmt.Errorf(`import "#/./x/y/z": invalid import path`), &_Want{}},
+		&_Case{10, `.../x/y/z`, `noroot1`, fmt.Errorf(`import ".../x/y/z": invalid import path`), &_Want{}},
+		&_Case{11, ``, `noroot1`, fmt.Errorf(`import "": invalid import path`), &_Want{}},
+		&_Case{12, `.//local1`, `noroot1`, fmt.Errorf(`import ".//local1": invalid import path`), &_Want{}},
+		&_Case{13, `/x/y/z`, `noroot1`, fmt.Errorf(`import "/x/y/z": cannot import absolute path`), &_Want{}},
+		&_Case{14, `//x/y/z`, `noroot1`, fmt.Errorf(`import "//x/y/z": cannot import absolute path`), &_Want{}},
+		&_Case{15, `.`, `notexist`, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\notexist`, FmtImportPath: `v:\notexist`, Dir: `v:\notexist`, Root: ``, ConflictDir: ``, Type: PackageStandAlone, Style: ImportStyleSelf, Formated: true}},
+		&_Case{16, `.`, `__goroot__/src/notexist`, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\__goroot__\src\notexist`, FmtImportPath: `notexist`, Dir: `v:\__goroot__\src\notexist`, Root: `v:\__goroot__`, ConflictDir: ``, Type: PackageGoRoot, Style: ImportStyleGlobal, Formated: true}},
+		&_Case{17, `x`, `gopath1/src/notexist`, nil, &_Want{OriginImportPath: `x`, ImporterDir: `v:\gopath1\src\notexist`, FmtImportPath: `x`, Dir: ``, Root: ``, ConflictDir: ``, Type: PackageUnknown, Style: ImportStyleGlobal, Formated: false}},
+		&_Case{18, `./doesnotexist`, `__goroot__/src/go/build`, nil, &_Want{OriginImportPath: `./doesnotexist`, ImporterDir: `v:\__goroot__\src\go\build`, FmtImportPath: `go/build/doesnotexist`, Dir: `v:\__goroot__\src\go\build\doesnotexist`, Root: `v:\__goroot__`, ConflictDir: ``, Type: PackageGoRoot, Style: ImportStyleGlobal, Formated: true}},
 		&_Case{19, `.`, `noroot1/testdata/local1`, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\noroot1\testdata\local1`, FmtImportPath: `v:\noroot1\testdata\local1`, Dir: `v:\noroot1\testdata\local1`, Root: ``, ConflictDir: ``, Type: PackageStandAlone, Style: ImportStyleSelf, Formated: true}},
 		&_Case{20, `.`, `localroot1/src/testdata/local1`, nil, &_Want{OriginImportPath: `.`, ImporterDir: `v:\localroot1\src\testdata\local1`, FmtImportPath: `v:\localroot1\src\testdata\local1`, Dir: `v:\localroot1\src\testdata\local1`, Root: ``, ConflictDir: ``, Type: PackageStandAlone, Style: ImportStyleSelf, Formated: true}},
 		&_Case{21, `#/x/y/z`, `notexist`, nil, &_Want{OriginImportPath: `#/x/y/z`, ImporterDir: `v:\notexist`, FmtImportPath: `#/x/y/z`, Dir: ``, Root: ``, ConflictDir: ``, Type: PackageUnknown, Style: ImportStyleLocalRoot, Formated: false}},
@@ -140,8 +140,9 @@ func TestFormatImportPath(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		dir := vdir(testCase.dir)
-		formated, err := testContext.FormatImportPath(testCase.imported, dir)
-		if genCase := false; genCase { //genCase
+		var formated FormatImport
+		err := formated.FormatImportPath(&testContext, testCase.imported, dir)
+		if genCase := true; genCase { //genCase
 			if err != nil {
 				fmt.Printf("&_Case{%d, `%s`, `%s`, fmt.Errorf(`%s`),&_Want{}},\n", i+1, testCase.imported, testCase.dir, err.Error())
 			} else {

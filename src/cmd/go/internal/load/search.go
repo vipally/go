@@ -374,7 +374,7 @@ func ImportPathsNoDotExpansion(args []string) []string {
 			out = append(out, allPackages(a)...)
 			continue
 		}
-		a = build.GetLocalRootRelatedImportPath(a) //Ally: convert #/x/y/z to x/y/z
+		//a = build.GetLocalRootRelatedImportPath(a) //Ally: convert #/x/y/z to x/y/z
 		out = append(out, a)
 	}
 	return out
