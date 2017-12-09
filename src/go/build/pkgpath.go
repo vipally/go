@@ -22,12 +22,6 @@ const (
 )
 
 var (
-	wd        = getwd()                                 // current working dir
-	goRootSrc = Default.joinPath(Default.GOROOT, "src") // GoRoot/src
-	gblSrcs   = Default.SrcDirs()                       // GoRoot/src & GoPaths/src
-)
-
-var (
 	//match "." ".." "./xxx" "../xxx"
 	//relatedRE = regexp.MustCompile(`^\.{1,2}(?:/.+)*?`)
 
@@ -79,13 +73,6 @@ func (ctxt *Context) searchLocalRoot(curPath string) (root, src string) {
 		}
 	}
 	return
-}
-
-// RefreshEnv refresh the global vars based on build context
-func (ctxt *Context) RefreshEnv() {
-	wd = getwd()                                  // current working dir
-	goRootSrc = ctxt.joinPath(ctxt.GOROOT, "src") // GoRoot/src
-	gblSrcs = ctxt.SrcDirs()                      // GoRoot/src & GoPaths/src
 }
 
 // FormatImportPath convert "." "./x/y/z" "../x/y/z" style import path to "#/x/y/z" "x/y/z" style if possible.
@@ -200,12 +187,12 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 // findGlobalRoot find root form GoRoot/GoPath for fullDir
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	foundRootSrc := ""
-	for _, rootsrc := range gblSrcs {
+	for _, rootsrc := range ctxt.SrcDirs() {
 		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok && !inTestdata(sub) {
 			fi.FmtImportPath = sub
 			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
 			fi.Style = ImportStyleGlobal
-			if rootsrc == goRootSrc {
+			if sub, ok := ctxt.hasSubdir(ctxt.GOROOT, rootsrc); ok && sub == "src" {
 				fi.Type = PackageGoRoot
 			} else {
 				fi.Type = PackageGoPath
@@ -217,7 +204,7 @@ func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 
 	found := foundRootSrc != ""
 	if found { //check if conflict
-		for _, rootsrc := range gblSrcs {
+		for _, rootsrc := range ctxt.SrcDirs() {
 			if rootsrc != foundRootSrc {
 				if dir := ctxt.joinPath(rootsrc, fi.FmtImportPath); ctxt.isDir(dir) {
 					fi.ConflictDir = dir
@@ -439,7 +426,7 @@ func (p *PackagePath) Init() {
 }
 
 func (p *PackagePath) FindImportFromWd(ctxt *Context, imported string, mode ImportMode) error {
-	return p.FindImport(ctxt, imported, wd, mode)
+	return p.FindImport(ctxt, imported, getwd(), mode)
 }
 
 func (p *PackagePath) copyFromFormatImport(fmted *FormatImport) {

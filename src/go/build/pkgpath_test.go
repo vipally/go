@@ -21,12 +21,11 @@ var (
 	vroot       = "/" //virtual fs root
 	thisDir     = getwd()
 	showResult  = false
-	genCase     = true
 )
 
 // init test evnironment
 // build a virtual file system
-func TestPkgPathBegin(t *testing.T) {
+func init() {
 	if testContext.GOOS == "windows" {
 		vroot = `v:`
 	}
@@ -51,7 +50,6 @@ func TestPkgPathBegin(t *testing.T) {
 	}
 	testContext.GOROOT = vdir("__goroot__")
 	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", vdir("gopath1"), filepath.ListSeparator, vdir("gopath2"), filepath.ListSeparator, vdir("gopath3"))
-	testContext.RefreshEnv()
 
 	//	fmt.Printf("%+v\n", gblSrcs)
 	//	fmt.Printf("%+v\n", testContext.GOROOT)
@@ -327,10 +325,6 @@ func TestSrcRE(t *testing.T) {
 	}
 }
 
-func setWd(dir string) {
-	wd = vdir(dir)
-}
-
 func full(vdir string) string {
 	if vdir == "" {
 		return ""
@@ -350,10 +344,4 @@ func vdir(related string) string {
 
 func tvdir(s string) string {
 	return "\t" + vdir(s)
-}
-
-// uninit test evnironment
-// destroy virtual file system
-func TestPkgPathEnd(t *testing.T) {
-	Default.RefreshEnv()
 }
