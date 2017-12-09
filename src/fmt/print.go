@@ -156,9 +156,11 @@ func (p *pp) Flag(b int) bool {
 	case '-':
 		return p.fmt.minus
 	case '+':
-		return p.fmt.plus || p.fmt.plusV || p.fmt.plusplusV
+		return p.fmt.plus || p.fmt.plusV
 	case '#':
-		return p.fmt.sharp || p.fmt.sharpV || p.fmt.sharpsharpV
+		return p.fmt.sharp || p.fmt.sharpV
+	case '@':
+		return p.fmt.pretty
 	case ' ':
 		return p.fmt.space
 	case '0':
@@ -362,7 +364,7 @@ func (p *pp) fmt0x64(v uint64, leading0x bool) {
 func (p *pp) fmtInteger(v uint64, isSigned bool, verb rune) {
 	switch verb {
 	case 'v':
-		if (p.fmt.sharpV || p.fmt.sharpsharpV) && !isSigned {
+		if p.fmt.sharpV && !isSigned {
 			p.fmt0x64(v, true)
 		} else {
 			p.fmt.fmt_integer(v, 10, isSigned, ldigits)
@@ -433,7 +435,7 @@ func (p *pp) fmtComplex(v complex128, size int, verb rune) {
 func (p *pp) fmtString(v string, verb rune) {
 	switch verb {
 	case 'v':
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
+		if p.fmt.sharpV {
 			p.fmt.fmt_q(v)
 		} else {
 			p.fmt.fmt_s(v)
@@ -454,7 +456,7 @@ func (p *pp) fmtString(v string, verb rune) {
 func (p *pp) fmtBytes(v []byte, verb rune, typeString string) {
 	switch verb {
 	case 'v', 'd':
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
+		if p.fmt.sharpV {
 			p.buf.WriteString(typeString)
 			if v == nil {
 				p.buf.WriteString(nilParenString)
@@ -503,7 +505,7 @@ func (p *pp) fmtPointer(value reflect.Value, verb rune) {
 
 	switch verb {
 	case 'v':
-		if p.fmt.sharpV || p.fmt.sharpsharpV {
+		if p.fmt.sharpV {
 			p.buf.WriteByte('(')
 			p.buf.WriteString(value.Type().String())
 			p.buf.WriteString(")(")
@@ -574,7 +576,7 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 	}
 
 	// If we're doing Go syntax and the argument knows how to supply it, take care of it now.
-	if p.fmt.sharpV || p.fmt.sharpsharpV {
+	if p.fmt.sharpV {
 		if stringer, ok := p.arg.(GoStringer); ok {
 			handled = true
 			defer p.catchPanic(p.arg, verb)
@@ -695,7 +697,7 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 
 // format a new line, for "%##v" "%++v" only
 func (p *pp) newLineIfRequire(depth int, last bool) bool {
-	if p.fmt.sharpsharpV || p.fmt.plusplusV {
+	if p.fmt.pretty {
 		//if the last line of data set, the depth will decrease
 		if last {
 			depth--
@@ -711,7 +713,7 @@ func (p *pp) newLineIfRequire(depth int, last bool) bool {
 
 // check if an array format need a new line
 func (p *pp) arrayRequireNewLine(elemKind reflect.Kind, index, size int) bool {
-	if p.fmt.sharpsharpV || p.fmt.plusplusV {
+	if p.fmt.pretty {
 		switch elemKind {
 		case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
 			reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
@@ -738,7 +740,7 @@ func (p *pp) extendVflagOnly() bool {
 func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) bool {
 	switch kind := v.Kind(); kind {
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
-		if p.fmt.sharpV || p.fmt.sharpsharpV { //write type name
+		if p.fmt.sharpV { //write type name
 			p.buf.WriteString(v.Type().String())
 			if (kind == reflect.Map || kind == reflect.Slice) && v.IsNil() {
 				p.buf.WriteString(nilParenString)
@@ -746,7 +748,7 @@ func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) 
 			}
 		}
 		switch {
-		case kind == reflect.Struct || p.fmt.sharpV || p.fmt.sharpsharpV:
+		case kind == reflect.Struct || p.fmt.sharpV:
 			p.buf.WriteByte('{')
 		case kind == reflect.Map:
 			p.buf.WriteString(mapString)
@@ -770,8 +772,8 @@ func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) 
 // write element separator in value sets(struct, map, slice, array).
 // element separator includes the probably new line
 func (p *pp) writeElemSeparator(newLine, last bool, depth int) {
-	if p.fmt.sharpV || p.fmt.sharpsharpV {
-		if !last || newLine && p.fmt.sharpsharpV {
+	if p.fmt.sharpV {
+		if !last || newLine && p.fmt.pretty {
 			p.buf.WriteByte(',')
 		}
 	}
@@ -786,7 +788,7 @@ func (p *pp) writeElemSeparator(newLine, last bool, depth int) {
 func (p *pp) writeValueSetTail(kind reflect.Kind) {
 	switch kind {
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
-		if kind == reflect.Struct || p.fmt.sharpV || p.fmt.sharpsharpV {
+		if kind == reflect.Struct || p.fmt.sharpV {
 			p.buf.WriteByte('}')
 		} else {
 			p.buf.WriteByte(']')
@@ -861,7 +863,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			return
 		}
 		for i, last := 0, numField-1; i < numField; i++ {
-			if p.fmt.plusV || p.fmt.sharpV || p.fmt.plusplusV || p.fmt.sharpsharpV {
+			if p.fmt.plusV || p.fmt.sharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
@@ -928,7 +930,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 	case reflect.Interface:
 		value := f.Elem()
 		if !value.IsValid() {
-			if p.fmt.sharpV || p.fmt.sharpsharpV {
+			if p.fmt.sharpV {
 				p.buf.WriteString(f.Type().String())
 				p.buf.WriteString(nilParenString)
 			} else {
@@ -1072,17 +1074,13 @@ formatLoop:
 			c := format[i]
 			switch c {
 			case '#':
-				if p.fmt.sharp { // "##" found
-					p.fmt.sharpsharp = true
-				}
 				p.fmt.sharp = true
 			case '0':
 				p.fmt.zero = !p.fmt.minus // Only allow zero padding to the left.
 			case '+':
-				if p.fmt.plus { // "++" found
-					p.fmt.plusplus = true
-				}
 				p.fmt.plus = true
+			case '@': //pretty flag
+				p.fmt.pretty = true
 			case '-':
 				p.fmt.minus = true
 				p.fmt.zero = false // Do not pad with zeros to the right.
@@ -1100,13 +1098,6 @@ formatLoop:
 						// Struct-field syntax
 						p.fmt.plusV = p.fmt.plus
 						p.fmt.plus = false
-
-						// Go syntax with indented-multi-line format
-						p.fmt.sharpsharpV = p.fmt.sharpsharp
-						p.fmt.sharpsharp = false
-						// Struct-field syntax with indented-multi-line format
-						p.fmt.plusplusV = p.fmt.plusplus
-						p.fmt.plusplus = false
 					}
 					p.printArg(a[argNum], rune(c))
 					argNum++
@@ -1203,13 +1194,6 @@ formatLoop:
 			// Struct-field syntax
 			p.fmt.plusV = p.fmt.plus
 			p.fmt.plus = false
-
-			// Go syntax with indented-multi-lines format
-			p.fmt.sharpsharpV = p.fmt.sharpsharp
-			p.fmt.sharpsharp = false
-			// Struct-field syntax with indented-multi-lines format
-			p.fmt.plusplusV = p.fmt.plusplus
-			p.fmt.plusplus = false
 			fallthrough
 		default:
 			p.printArg(a[argNum], verb)
