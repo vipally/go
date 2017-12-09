@@ -33,6 +33,24 @@ var (
 	srcRE = regexp.MustCompile(`(^.+)[\\|/]src(?:$|\\|/)`)
 )
 
+// SetGoRoot change GOROOT and RefreshEnvCache
+func (ctxt *Context) SetGoRoot(root string) {
+	ctxt.GOROOT = root
+	ctxt.RefreshEnvCache()
+}
+
+// SetGoRoot change GOPATH and RefreshEnvCache
+func (ctxt *Context) SetGoPath(path string) {
+	ctxt.GOPATH = path
+	ctxt.RefreshEnvCache()
+}
+
+// RefreshEnvCache update cached environment valuse when GOROOT/GOPATH changes
+func (ctxt *Context) RefreshEnvCache() {
+	ctxt.goRootSrc = ctxt.joinPath(ctxt.GOROOT, "src")
+	ctxt.gblSrcs = ctxt.SrcDirs()
+}
+
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath,
 // which is the root of local project.
 // SearchLocalRoot will never match path under GoRoot.
@@ -187,12 +205,12 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 // findGlobalRoot find root form GoRoot/GoPath for fullDir
 func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 	foundRootSrc := ""
-	for _, rootsrc := range ctxt.SrcDirs() {
+	for _, rootsrc := range ctxt.gblSrcs {
 		if sub, ok := ctxt.hasSubdir(rootsrc, fullDir); ok && !inTestdata(sub) {
 			fi.FmtImportPath = sub
 			fi.Root = rootsrc[:len(rootsrc)-4] //remove suffix "/src"
 			fi.Style = ImportStyleGlobal
-			if sub, ok := ctxt.hasSubdir(ctxt.GOROOT, rootsrc); ok && sub == "src" {
+			if ctxt.goRootSrc == rootsrc {
 				fi.Type = PackageGoRoot
 			} else {
 				fi.Type = PackageGoPath
@@ -204,7 +222,7 @@ func (fi *FormatImport) findGlobalRoot(ctxt *Context, fullDir string) bool {
 
 	found := foundRootSrc != ""
 	if found { //check if conflict
-		for _, rootsrc := range ctxt.SrcDirs() {
+		for _, rootsrc := range ctxt.gblSrcs {
 			if rootsrc != foundRootSrc {
 				if dir := ctxt.joinPath(rootsrc, fi.FmtImportPath); ctxt.isDir(dir) {
 					fi.ConflictDir = dir

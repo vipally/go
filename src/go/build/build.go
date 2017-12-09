@@ -54,6 +54,11 @@ type Context struct {
 	// "linux_386_race" instead of the usual "linux_386".
 	InstallSuffix string
 
+	// Follow varables are frequently used, so we cache them.
+	// When config of GoPath/GoRoot changes, must refresh them by RefreshEnvCache.
+	goRootSrc string   // GoRoot/src
+	gblSrcs   []string // GoRoot/src + Gopaths/src
+
 	// By default, Import uses the operating system's file system calls
 	// to read directories and files. To read from other sources,
 	// callers can set the following functions. They all have default
@@ -324,6 +329,7 @@ func defaultContext() Context {
 		c.CgoEnabled = false
 	}
 
+	c.RefreshEnvCache() //refresh cached env value
 	return c
 }
 

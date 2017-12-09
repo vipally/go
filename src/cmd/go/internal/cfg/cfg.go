@@ -90,7 +90,7 @@ var (
 
 // Update build context to use our computed GOROOT.
 func init() {
-	BuildContext.GOROOT = GOROOT
+	BuildContext.SetGoRoot(GOROOT)
 	// Note that we must use runtime.GOOS and runtime.GOARCH here,
 	// as the tool directory does not move based on environment variables.
 	// This matches the initialization of ToolDir in go/build,

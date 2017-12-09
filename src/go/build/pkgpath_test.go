@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	fsRoot      = testContext.joinPath(getwd(), "testdata/vroot")
+	thisDir     = getwd()
+	fsRoot      = testContext.joinPath(thisDir, "testdata/vroot")
 	testContext = defaultContext()
 	vroot       = "/" //virtual fs root
-	thisDir     = getwd()
 	showResult  = false
 )
 
@@ -50,15 +50,7 @@ func init() {
 	}
 	testContext.GOROOT = vdir("__goroot__")
 	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", vdir("gopath1"), filepath.ListSeparator, vdir("gopath2"), filepath.ListSeparator, vdir("gopath3"))
-
-	//	fmt.Printf("%+v\n", gblSrcs)
-	//	fmt.Printf("%+v\n", testContext.GOROOT)
-	//	fmt.Printf("%+v\n", goRootSrc)
-	//	fmt.Printf("%+v\n", full(goRootSrc))
-	//	fmt.Printf("%+v\n", gblSrcs[0])
-	//	fmt.Printf("%+v\n", full(gblSrcs[0]))
-	//	fmt.Printf("%+v\n", testContext.SearchLocalRoot(vdir(`localroot1\src\vendor`)))
-	//	fmt.Printf("%+v\n", full("v:\\"))
+	testContext.RefreshEnvCache()
 }
 
 func TestSearchLocalRoot(t *testing.T) {
