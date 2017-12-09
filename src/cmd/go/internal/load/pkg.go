@@ -378,9 +378,14 @@ const (
 
 // GetPkgSignature returns the key of a import path from cache
 // It use a faster way to find the target package path than build.PackagePath.FindImport
-func GetPkgSignature(parent *Package, path, srcDir string, mode int) string {
+func GetPkgSignature(parent *Package, path string, mode int) (string, string) {
 	style, _ := build.GetImportStyle(path)
 	pkgSignature := path
+	debugDeprecatedImportcfgDir := ""
+	srcDir := ""
+	if parent != nil {
+		srcDir = parent.Dir
+	}
 	switch {
 	case style.IsRelated():
 		pkgSignature = build.DirToImportPath(filepath.Join(srcDir, path))
@@ -391,12 +396,16 @@ func GetPkgSignature(parent *Package, path, srcDir string, mode int) string {
 		} else {
 			localRoot = cfg.BuildContext.SearchLocalRoot(srcDir)
 		}
-		pkgSignature = build.DirToImportPath(filepath.Join(localRoot, path))
+		importPath := style.RealImportPath(path)
+		if mode&UseVendor != 0 {
+			importPath = cfg.BuildContext.VendoredLocalRootPath(importPath, srcDir, localRoot)
+		}
+		pkgSignature = build.DirToImportPath(filepath.Join(localRoot, importPath))
 	case style.IsGlobal(): //vendor?
 		switch {
 		case DebugDeprecatedImportcfg.enabled:
 			if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
-				//debugDeprecatedImportcfgDir = d
+				debugDeprecatedImportcfgDir = d
 				pkgSignature = i
 			}
 		case mode&UseVendor != 0:
@@ -404,8 +413,9 @@ func GetPkgSignature(parent *Package, path, srcDir string, mode int) string {
 			pkgSignature = vendor
 		}
 	default:
+		pkgSignature = path
 	}
-	return pkgSignature
+	return pkgSignature, debugDeprecatedImportcfgDir
 }
 
 // LoadImport scans the directory named by path, which must be an import path,
@@ -416,69 +426,9 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	stk.Push(path)
 	defer stk.Pop()
 
-	buildMode := build.ImportComment
-	if mode&UseVendor == 0 { // Not vendoring
-		buildMode |= build.IgnoreVendor
-	}
-	var pkgPath build.PackagePath
-	_ = pkgPath.FindImport(&cfg.BuildContext, path, srcDir, buildMode) //ignore error
-
-	// Determine canonical identifier for this package.
-	// For a local import the identifier is the pseudo-import path
-	// we create from the full directory to the package.
-	// Otherwise it is the usual import path.
-	// For vendored imports, it is the expanded form.
-	pkgSignature := pkgPath.Signature
-
-	var debugDeprecatedImportcfgDir string
-	if pkgPath.Type.IsGlobalPackage() {
-		if DebugDeprecatedImportcfg.enabled {
-			if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
-				debugDeprecatedImportcfgDir = d
-				pkgSignature = i
-			}
-		}
-	}
-
-	searchLocalRoot := func() string {
-		localRoot := ""
-		if parent != nil {
-			localRoot = parent.Internal.LocalRoot
-		} else {
-			localRoot = cfg.BuildContext.SearchLocalRoot(srcDir)
-		}
-		return localRoot
-	}
-
-	importPath := path
 	origPath := path
-	isLocal := build.IsLocalImport(path)
-	localRoot := searchLocalRoot()
-	isLocalRootRelated := localRoot != "" && localRoot != cfg.BuildContext.GOROOT
-
-	//	if isLocalRootRelated {
-	//		importPath = build.GetLocalRootRelatedPath(localRoot, path)
-	//		if importPath == "." {
-	//			importPath = srcDir
-	//		}
-	//		if strings.HasPrefix(importPath, localRoot) {
-	//			importPath = dirToImportPath(importPath)
-	//		}
-	//	} else if isLocal {
-	//		importPath = dirToImportPath(filepath.Join(srcDir, path))
-	//	} else if DebugDeprecatedImportcfg.enabled {
-	//		if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
-	//			debugDeprecatedImportcfgDir = d
-	//			importPath = i
-	//		}
-	//	} else if mode&UseVendor != 0 {
-	//		// We do our own vendor resolution, because we want to
-	//		// find out the key to use in packageCache without the
-	//		// overhead of repeated calls to buildContext.Import.
-	//		// The code is also needed in a few other places anyway.
-	//		path = VendoredImportPath(parent, path)
-	//		importPath = path
-	//	}
+	style, _ := build.GetImportStyle(path)
+	pkgSignature, debugDeprecatedImportcfgDir := GetPkgSignature(parent, path, mode)
 
 	//fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
 	p := packageCache[pkgSignature]
@@ -486,12 +436,6 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		p = reusePackage(p, stk)
 	} else {
 		p = new(Package)
-		//p.Internal.Local = isLocal
-		//Ally debug:
-		//fmt.Printf("LoadImport [%s] [%s] \nisLocal=%v  importPath=%s\nparent=%#v\n", path, srcDir, isLocal, importPath, parent)
-		//		if isLocal || isLocalRootRelated {
-		//			p.ImportPath = importPath
-		//		}
 
 		packageCache[pkgSignature] = p
 
@@ -504,20 +448,17 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			bp, err = cfg.BuildContext.ImportDir(debugDeprecatedImportcfgDir, 0)
 		} else {
 			buildMode := build.ImportComment
-			if mode&UseVendor == 0 || path != origPath {
+			if mode&UseVendor == 0 || path != pkgSignature {
 				// Not vendoring, or we already found the vendored path.
 				buildMode |= build.IgnoreVendor
 			}
 			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
 		}
-		if isLocal || isLocalRootRelated {
-			bp.ImportPath = importPath
-		}
 
 		if cfg.GOBIN != "" {
 			bp.BinDir = cfg.GOBIN
 		}
-		if debugDeprecatedImportcfgDir == "" && err == nil && !isLocal && bp.ImportComment != "" && bp.ImportComment != path &&
+		if debugDeprecatedImportcfgDir == "" && err == nil && !style.IsRelated() && bp.ImportComment != "" && bp.ImportComment != path &&
 			!strings.Contains(path, "/vendor/") && !strings.HasPrefix(path, "vendor/") {
 			err = fmt.Errorf("code in directory %s expects import %q", bp.Dir, bp.ImportComment)
 		}

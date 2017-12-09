@@ -98,10 +98,22 @@ func (ctxt *Context) searchLocalRoot(curPath string) (root, src string) {
 // For PackageStandAlone and PackageLocalRoot, return a pseudo-import path by dirToImportPath
 // For PackageGoRoot and PackageGoPath, return path
 // A fast way to find key of package chache
-func (ctxt *Context) GetPkgSignature(imported, importerDir string, mode ImportMode) string {
+func (ctxt *Context) GetPkgSignature(imported, importerDir, parentRoot string, mode ImportMode) string {
 	var packagePath PackagePath
 	_ = packagePath.FindImport(ctxt, imported, importerDir, mode) //ignore error
 	return packagePath.Signature
+}
+
+// VenderedLocalRootPath find if vendored from localRoot
+// imported must "x/y/z" style
+func (ctxt *Context) VendoredLocalRootPath(imported, srcDir, localRoot string) string {
+	if localRoot != "" {
+		vendored := ctxt.matchVendorFromRoot(imported, srcDir, localRoot, localRoot, PackageLocalRoot, nil)
+		if vendored != "" {
+			return vendored
+		}
+	}
+	return imported
 }
 
 func getOrDef(s, def string) string {
