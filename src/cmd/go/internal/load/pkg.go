@@ -103,8 +103,9 @@ type PackageInternal struct {
 
 	LocalRoot    string //Ally: root of local project(which contains sub-directory "vendor")
 	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference or with [import "#"] comment
-	Local        bool   // imported via local path (./ or ../)
-	LocalPrefix  string // interpret ./ and ../ imports relative to this prefix
+
+	Local       bool   // imported via local path (./ or ../)
+	LocalPrefix string // interpret ./ and ../ imports relative to this prefix
 
 	ExeName     string               // desired name for temporary executable
 	CoverMode   string               // preprocess Go source files with the coverage tool in this mode
@@ -231,7 +232,6 @@ func (p *Package) copyBuild(pp *build.Package) {
 		p.XTestImports = nil
 	}
 
-	p.Internal.LocalPackage = pp.LocalPackage
 	p.Internal.LocalRoot = pp.LocalRoot
 	p.ImportPath = pp.ImportPath
 }
@@ -345,18 +345,18 @@ func ReloadPackage(arg string, stk *ImportStack) *Package {
 // Using a pseudo-import path like this makes the ./ imports no longer
 // a special case, so that all the code to deal with ordinary imports works
 // automatically.
-func dirToImportPath(dir string) string {
-	return pathpkg.Join("_", strings.Map(makeImportValid, filepath.ToSlash(dir)))
-}
+//func dirToImportPath(dir string) string {
+//	return pathpkg.Join("_", strings.Map(makeImportValid, filepath.ToSlash(dir)))
+//}
 
-func makeImportValid(r rune) rune {
-	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
-	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
-	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
-		return '_'
-	}
-	return r
-}
+//func makeImportValid(r rune) rune {
+//	// Should match Go spec, compilers, and ../../go/parser/parser.go:/isValidImport.
+//	const illegalChars = `!"#$%&'()*,:;<=>?[\]^{|}` + "`\uFFFD"
+//	if !unicode.IsGraphic(r) || unicode.IsSpace(r) || strings.ContainsRune(illegalChars, r) {
+//		return '_'
+//	}
+//	return r
+//}
 
 // Mode flags for loadImport and download (in get.go).
 const (
@@ -383,6 +383,10 @@ const (
 func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPos []token.Position, mode int) *Package {
 	stk.Push(path)
 	defer stk.Pop()
+
+	//	var importPath build.PackagePath
+	//	if err := importPath.FindImport(path, srcDir); err != nil {
+	//	}
 
 	searchLocalRoot := func() string {
 		localRoot := ""

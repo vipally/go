@@ -49,6 +49,7 @@ func (ctxt *Context) SetGoPath(path string) {
 func (ctxt *Context) RefreshEnvCache() {
 	ctxt.goRootSrc = ctxt.joinPath(ctxt.GOROOT, "src")
 	ctxt.gblSrcs = ctxt.SrcDirs()
+	ctxt.gopaths = ctxt.gopath()
 }
 
 // SearchLocalRoot find the <root> path that contains such patten of sub-tree "<root>/src/vendor/" up from curPath,
@@ -97,6 +98,35 @@ func (ctxt *Context) searchLocalRoot(curPath string) (root, src string) {
 func (ctxt *Context) FormatImportPath(imported, importerDir string) (formated FormatImport, err error) {
 	err = formated.FormatImportPath(ctxt, imported, importerDir)
 	return
+}
+
+// GetPackageSignature return signature of an import package.
+// For PackageStandAlone and PackageLocalRoot, return a pseudo-import path by dirToImportPath
+// For PackageGoRoot and PackageGoPath, return path
+func (ctxt *Context) GetPackageSignature(imported, importerDir string) string {
+	signature := ""
+	fmted, _ := ctxt.FormatImportPath(imported, importerDir)
+	if !fmted.Formated && fmted.Style.IsLocalRoot() {
+		root := getOrDef(ctxt.SearchLocalRoot(importerDir), "__notexist_localroot__")
+		fmted.Dir = fmted.Style.FullImportPath(fmted.FmtImportPath, root)
+	}
+	switch fmted.Style {
+	case ImportStyleGlobal: // import "x/y/z", global style
+		signature = fmted.FmtImportPath
+	case ImportStyleLocalRoot: // import "#/x/y/z", global style
+		fallthrough
+	default: //ImportStyleUnknown,ImportStyleSelf,ImportStyleRelated
+		signature = dirToImportPath(fmted.Dir)
+	}
+
+	return signature
+}
+
+func getOrDef(s, def string) string {
+	if s != "" {
+		return s
+	}
+	return def
 }
 
 // FormatImport is formated import infomation, which prefers "#/foo" "x/y/z" to "./x/y/z" if possible.
@@ -523,25 +553,20 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 		gopath    []string
 		localroot string
 	}
-	gopath := ctxt.gopath()
 	binaryOnly := false
 	pkga := ""
 
 	// Vendor directories get first chance to satisfy import.
 	if mode&IgnoreVendor == 0 && srcDir != "" {
-		//search local vendor first
-		if localRoot := p.searchLocalRoot(ctxt, srcDir); localRoot != "" {
-			if p.findFromVendor(ctxt, imported, srcDir, localRoot, PackageLocalRoot, &tried.vendor) {
-				return nil
-			}
-		}
-		if p.findFromVendor(ctxt, imported, srcDir, ctxt.GOROOT, PackageGoRoot, &tried.vendor) {
+		localRoot := p.searchLocalRoot(ctxt, srcDir)
+		vendored, root, ptype := ctxt.findFromVendor(imported, srcDir, localRoot, &tried.vendor)
+		if vendored != "" {
+			p.ImportPath = vendored
+			p.Root = root
+			p.Type = ptype
+			p.IsVendor = true
+			p.Dir = ctxt.joinPath(root, "src", vendored)
 			return nil
-		}
-		for _, root := range gopath {
-			if p.findFromVendor(ctxt, imported, srcDir, root, PackageGoPath, &tried.vendor) {
-				return nil
-			}
 		}
 	}
 
@@ -561,8 +586,9 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 		}
 		tried.goroot = dir
 	}
+
 	//search gopath
-	for _, root := range gopath {
+	for _, root := range ctxt.gopaths {
 		dir := ctxt.joinPath(root, "src", imported)
 		isDir := ctxt.isDir(dir)
 		binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(root, pkga))
@@ -575,6 +601,7 @@ func (p *PackagePath) findGlobalPackage(ctxt *Context, imported, srcDir string, 
 		}
 		tried.gopath = append(tried.gopath, dir)
 	}
+
 	//search local root
 	if localRoot := p.searchLocalRoot(ctxt, srcDir); localRoot != "" {
 		dir := ctxt.joinPath(localRoot, "src", imported)
@@ -623,18 +650,46 @@ func (p *PackagePath) searchLocalRoot(ctxt *Context, srcDir string) string {
 	return p.LocalRoot
 }
 
+func (ctxt *Context) findFromVendor(imported, srcDir, localRoot string,
+	triedvendor *[]string) (vendored, root string, ptype PackageType) {
+
+	//search local vendor first
+	if localRoot != "" {
+		vendored = ctxt.matchVendorFromRoot(imported, srcDir, localRoot, localRoot, PackageLocalRoot, triedvendor)
+		if vendored != "" {
+			root, ptype = localRoot, PackageLocalRoot
+			return
+		}
+	}
+
+	vendored = ctxt.matchVendorFromRoot(imported, srcDir, ctxt.GOROOT, localRoot, PackageGoRoot, triedvendor)
+	if vendored != "" {
+		root, ptype = ctxt.GOROOT, PackageGoRoot
+		return
+	}
+
+	for _, root_ := range ctxt.gopaths {
+		vendored = ctxt.matchVendorFromRoot(imported, srcDir, root_, localRoot, PackageGoPath, triedvendor)
+		if vendored != "" {
+			root, ptype = root_, PackageGoPath
+			return
+		}
+	}
+	return
+}
+
 //try to find matched vendor under root
-func (p *PackagePath) findFromVendor(ctxt *Context, imported, srcDir, root string,
-	ptype PackageType, triedvendor *[]string) bool {
+func (ctxt *Context) matchVendorFromRoot(imported, srcDir, root, localRoot string,
+	ptype PackageType, triedvendor *[]string) (vendored string) {
 	sub, ok := ctxt.hasSubdir(root, srcDir)
 	if !ok || !strings.HasPrefix(sub, "src/") || inTestdata(sub) {
-		return false
+		return
 	}
 
 	//ignore local vendor if search for global vendor
-	if !ptype.IsLocalPackage() && p.LocalRoot != "" {
-		if _, ok := ctxt.hasSubdir(p.LocalRoot, srcDir); ok {
-			parent := parentPath(p.LocalRoot)
+	if !ptype.IsLocalPackage() && localRoot != "" {
+		if _, ok := ctxt.hasSubdir(localRoot, srcDir); ok {
+			parent := parentPath(localRoot)
 			sub, _ = ctxt.hasSubdir(root, parent)
 		}
 	}
@@ -642,30 +697,25 @@ func (p *PackagePath) findFromVendor(ctxt *Context, imported, srcDir, root strin
 	for sub != "" {
 		vendor := ctxt.joinPath(root, sub, "vendor")
 
-		//				fmt.Printf("search vendor: \n\troot[%s] \n\ttype[%v] \n\tsub[%s] \n\tvendor[%s]\n\tLocalRoot[%s]\n",
-		//					root, ptype, sub, vendor, p.LocalRoot)
+		//fmt.Printf("search vendor: \n\troot[%s] \n\ttype[%v] \n\tsub[%s] \n\tvendor[%s]\n\tLocalRoot[%s]\n", root, ptype, sub, vendor, localRoot)
 
 		if ctxt.isDir(vendor) {
 			dir := ctxt.joinPath(vendor, imported)
 			if ctxt.isDir(dir) && hasGoFiles(ctxt, dir) {
-				p.Dir = dir
-
 				//remove prefix "src/" from sub
 				if sub = sub[3:]; len(sub) > 0 {
 					sub = sub[1:]
 				}
-
-				p.ImportPath = pathpkg.Join(sub, "vendor", imported)
-				p.Type = ptype
-				p.Root = root
-				p.IsVendor = true
-				return true
+				vendored = pathpkg.Join(sub, "vendor", imported)
+				return
 			}
-			*triedvendor = append(*triedvendor, dir)
+			if triedvendor != nil {
+				*triedvendor = append(*triedvendor, dir)
+			}
 		}
 		sub = parentPath(sub)
 	}
-	return false
+	return
 }
 
 // genSignature returns signature of a package

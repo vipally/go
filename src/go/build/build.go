@@ -58,6 +58,7 @@ type Context struct {
 	// When config of GoPath/GoRoot changes, must refresh them by RefreshEnvCache.
 	goRootSrc string   // GoRoot/src
 	gblSrcs   []string // GoRoot/src + Gopaths/src
+	gopaths   []string // Gopaths
 
 	// By default, Import uses the operating system's file system calls
 	// to read directories and files. To read from other sources,
