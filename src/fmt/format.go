@@ -35,7 +35,7 @@ type fmtFlags struct {
 	plusV  bool
 	sharpV bool
 
-	// flag '@', print as pretty style(a indented-multi-lines style string)
+	// flag '@', print as pretty style(an indented-multi-lines style string)
 	// for verb 'v' only, eg: %@#v %@+v %@v
 	pretty bool
 }
