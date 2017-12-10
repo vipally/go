@@ -877,21 +877,6 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 
 	case reflect.Array, reflect.Slice:
 		switch verb {
-		case 'v':
-			size, elemKind := f.Len(), f.Type().Elem().Kind()
-			firstNewLine := p.arrayRequireNewLine(elemKind, 0, size)
-			if !p.writeValueSetHead(f, firstNewLine, size == 0, depth) {
-				return
-			}
-
-			for i, last := 0, size-1; i < size; i++ {
-				p.printValue(f.Index(i), verb, depth+1)
-				isLast := i == last
-				newLine := firstNewLine && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
-				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' ' or newLine
-			}
-			p.writeValueSetTail(f.Kind())
-
 		case 's', 'q', 'x', 'X':
 			// Handle byte and uint8 slices and arrays special for the above verbs.
 			t := f.Type()
@@ -915,14 +900,19 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			}
 			fallthrough
 		default:
-			p.buf.WriteByte('[')
-			for i := 0; i < f.Len(); i++ {
-				if i > 0 {
-					p.buf.WriteByte(' ')
-				}
-				p.printValue(f.Index(i), verb, depth+1)
+			size, elemKind := f.Len(), f.Type().Elem().Kind()
+			firstNewLine := p.arrayRequireNewLine(elemKind, 0, size)
+			if !p.writeValueSetHead(f, firstNewLine, size == 0, depth) {
+				return
 			}
-			p.buf.WriteByte(']')
+
+			for i, last := 0, size-1; i < size; i++ {
+				p.printValue(f.Index(i), verb, depth+1)
+				isLast := i == last
+				newLine := firstNewLine && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
+				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' ' or newLine
+			}
+			p.writeValueSetTail(f.Kind())
 		}
 
 	case reflect.Interface:
