@@ -207,8 +207,9 @@ func (fi *FormatImport) FormatImportPath(ctxt *Context, imported, importerDir st
 		}
 
 		//StandAlone package out of LocalPath/GoRoot/GoPath
-		fi.FmtImportPath = fi.Dir
+		fi.FmtImportPath = "."
 		fi.Type = PackageStandAlone
+		fi.Style = ImportStyleSelf
 	} else {
 		if inTestdata(fi.FmtImportPath) {
 			return fmt.Errorf("import %q: cannot refer package under testdata", fi.FmtImportPath)
