@@ -405,6 +405,8 @@ func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 	p.Type = pp.Type
 	p.Style = pp.Style
 
+	p.Goroot = p.Type.IsStdPackage()
+
 	var pkgtargetroot string
 	var pkga string
 	var pkgerr error

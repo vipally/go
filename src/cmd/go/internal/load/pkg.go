@@ -378,11 +378,12 @@ const (
 
 // GetPkgSignature returns the key of a import path from cache
 // It use a faster way to find the target package path than build.PackagePath.FindImport
-func GetPkgSignature(parent *Package, path string, mode int) (string, string) {
+func GetPkgSignature(parent *Package, path string, mode int) (importPath string, debugDir string, vendor bool) {
 	style, _ := build.GetImportStyle(path)
 	pkgSignature := path
 	debugDeprecatedImportcfgDir := ""
 	srcDir := ""
+	vendored := false
 	if parent != nil {
 		srcDir = parent.Dir
 	}
@@ -398,7 +399,9 @@ func GetPkgSignature(parent *Package, path string, mode int) (string, string) {
 		}
 		importPath := style.RealImportPath(path)
 		if mode&UseVendor != 0 {
-			importPath = cfg.BuildContext.VendoredLocalRootPath(importPath, srcDir, localRoot)
+			vendor := cfg.BuildContext.VendoredLocalRootPath(importPath, srcDir, localRoot)
+			vendored = vendor != importPath
+			importPath = vendor
 		}
 		pkgSignature = build.DirToImportPath(filepath.Join(localRoot, importPath))
 	case style.IsGlobal(): //vendor?
@@ -410,12 +413,13 @@ func GetPkgSignature(parent *Package, path string, mode int) (string, string) {
 			}
 		case mode&UseVendor != 0:
 			vendor := VendoredImportPath(parent, path)
+			vendored = vendor != path
 			pkgSignature = vendor
 		}
 	default:
 		pkgSignature = path
 	}
-	return pkgSignature, debugDeprecatedImportcfgDir
+	return pkgSignature, debugDeprecatedImportcfgDir, vendored
 }
 
 // LoadImport scans the directory named by path, which must be an import path,
@@ -428,7 +432,10 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 
 	origPath := path
 	style, _ := build.GetImportStyle(path)
-	pkgSignature, debugDeprecatedImportcfgDir := GetPkgSignature(parent, path, mode)
+	pkgSignature, debugDeprecatedImportcfgDir, vendored := GetPkgSignature(parent, path, mode)
+	if vendored {
+		path = pkgSignature
+	}
 
 	//fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
 	p := packageCache[pkgSignature]
@@ -448,7 +455,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			bp, err = cfg.BuildContext.ImportDir(debugDeprecatedImportcfgDir, 0)
 		} else {
 			buildMode := build.ImportComment
-			if mode&UseVendor == 0 || path != pkgSignature {
+			if mode&UseVendor == 0 || vendored {
 				// Not vendoring, or we already found the vendored path.
 				buildMode |= build.IgnoreVendor
 			}
