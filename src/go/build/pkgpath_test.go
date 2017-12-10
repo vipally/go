@@ -51,6 +51,12 @@ func init() {
 	testContext.GOROOT = vdir("__goroot__")
 	testContext.GOPATH = fmt.Sprintf("%s%c%s%c%s", vdir("gopath1"), filepath.ListSeparator, vdir("gopath2"), filepath.ListSeparator, vdir("gopath3"))
 	testContext.RefreshEnvCache()
+
+	//	var pp PackagePath
+	//	imported := `#/localrootvd1/src/locals/local2`
+	//	dir := `E:\localpackage\localroot\src\publics\public1`
+	//	_ = pp.FindImport(&Default, imported, dir, 0)
+	//	fmt.Printf("%@#v\n", pp)
 }
 
 func TestSearchLocalRoot(t *testing.T) {

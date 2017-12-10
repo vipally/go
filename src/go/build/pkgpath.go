@@ -488,6 +488,11 @@ func (p *PackagePath) FindImport(ctxt *Context, imported, srcDir string, mode Im
 	defer func() {
 		p.searchLocalRoot(ctxt, srcDir)
 		p.genSignature()
+		//		if err != nil {
+		//			fmt.Println(imported, srcDir, mode, err)
+		//			fmt.Printf("%@#v\n", p)
+		//			panic("error")
+		//		}
 	}()
 
 	formated := false

@@ -378,21 +378,17 @@ const (
 
 // GetPkgSignature returns the key of a import path from cache
 // It use a faster way to find the target package path than build.PackagePath.FindImport
-func GetPkgSignature(parent *Package, path string, mode int) (importPath string, debugDir string, vendor bool) {
+func GetPkgSignature(parent *Package, path, srcDir string, mode int) (importPath string, debugDir string, vendor bool) {
 	style, _ := build.GetImportStyle(path)
 	pkgSignature := path
 	debugDeprecatedImportcfgDir := ""
-	srcDir := ""
 	vendored := false
-	if parent != nil {
-		srcDir = parent.Dir
-	}
 	switch {
 	case style.IsRelated():
 		pkgSignature = build.DirToImportPath(filepath.Join(srcDir, path))
 	case style.IsLocalRoot():
 		localRoot := ""
-		if parent != nil {
+		if parent != nil && parent.Internal.LocalRoot != "" && strings.HasPrefix(srcDir, parent.Internal.LocalRoot) {
 			localRoot = parent.Internal.LocalRoot
 		} else {
 			localRoot = cfg.BuildContext.SearchLocalRoot(srcDir)
@@ -432,12 +428,12 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 
 	origPath := path
 	style, _ := build.GetImportStyle(path)
-	pkgSignature, debugDeprecatedImportcfgDir, vendored := GetPkgSignature(parent, path, mode)
+	pkgSignature, debugDeprecatedImportcfgDir, vendored := GetPkgSignature(parent, path, srcDir, mode)
 	if vendored {
 		path = pkgSignature
 	}
 
-	//fmt.Printf("LoadImport [%s][%s] importPath=%s\n", path, srcDir, importPath)
+	//fmt.Printf("LoadImport [%s][%s] pkgSignature=%s\n", path, srcDir, pkgSignature)
 	p := packageCache[pkgSignature]
 	if p != nil {
 		p = reusePackage(p, stk)
@@ -824,6 +820,8 @@ func disallowVendorVisibility(srcDir string, p *Package, stk *ImportStack) *Pack
 	if hasFilePathPrefix(filepath.Clean(srcDir), filepath.Clean(parent)) {
 		return p
 	}
+
+	//fmt.Printf("disallowVendorVisibility srcDir=[%s] ImportPath=[%s] Dir=[%s] parent=[%s] p=%@#v\n",srcDir, p.ImportPath, p.Dir, parent, p)
 
 	// Vendor is present, and srcDir is outside parent's tree. Not allowed.
 	perr := *p
