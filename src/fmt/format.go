@@ -408,7 +408,7 @@ func (f *fmt) fmt_bx(b []byte, digits string) {
 	f.fmt_sbx("", b, digits)
 }
 
-// "%@#v" "%@+v" "%@v" only ("%#v" "%+v" optional)
+// flag '@' (pretty) only ("%#v" "%+v" optional)
 func (f *fmt) extendVflagOnly() bool {
 	// do not effect exists "%#v" "%+v", so do not include sharpV and plusV
 	return f.pretty //|| f.sharpV || f.plusV

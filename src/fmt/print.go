@@ -695,7 +695,7 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 	}
 }
 
-// format a new line, for "%##v" "%++v" only
+// format a new line, for flag '@' (pretty) only
 func (p *pp) newLineIfRequire(depth int, last bool) bool {
 	if p.fmt.pretty {
 		//if the last line of data set, the depth will decrease
@@ -728,7 +728,7 @@ func (p *pp) arrayRequireNewLine(elemKind reflect.Kind, index, size int) bool {
 	return false
 }
 
-// "%##v" "%++v" only ("%#v" "%+v" optional)
+// flag '@' (pretty) only ("%#v" "%+v" optional)
 func (p *pp) extendVflagOnly() bool {
 	return p.fmt.extendVflagOnly()
 }
@@ -907,7 +907,6 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			if !p.writeValueSetHead(f, firstNewLine, size == 0, depth) {
 				return
 			}
-
 			for i, last := 0, size-1; i < size; i++ {
 				p.printValue(f.Index(i), verb, depth+1)
 				isLast := i == last
