@@ -378,44 +378,43 @@ const (
 
 // GetPkgSignature returns the key of a import path from cache
 // It use a faster way to find the target package path than build.PackagePath.FindImport
-func GetPkgSignature(parent *Package, path, srcDir string, mode int) (importPath string, debugDir string, vendor bool) {
-	style, _ := build.GetImportStyle(path)
-	pkgSignature := path
-	debugDeprecatedImportcfgDir := ""
-	vendored := false
+func GetPkgSignature(parent *Package, path, srcDir string, mode int) (pkgSignature, vendoredPath, stkPath, debugDir string) {
+	pkgSignature = path
+	vendoredPath = path
+	stkPath = path
+	debugDir = ""
+
+	style, _ := build.GetImportStyle(path) //ignore error
 	switch {
 	case style.IsRelated():
 		pkgSignature = build.DirToImportPath(filepath.Join(srcDir, path))
 	case style.IsLocalRoot():
-		localRoot := ""
-		if parent != nil && parent.Internal.LocalRoot != "" && strings.HasPrefix(srcDir, parent.Internal.LocalRoot) {
-			localRoot = parent.Internal.LocalRoot
-		} else {
-			localRoot = cfg.BuildContext.SearchLocalRoot(srcDir)
-		}
+		localRoot := cfg.BuildContext.SearchLocalRoot(srcDir)
 		importPath := style.RealImportPath(path)
 		if mode&UseVendor != 0 {
-			vendor := cfg.BuildContext.VendoredLocalRootPath(importPath, srcDir, localRoot)
-			vendored = vendor != importPath
-			importPath = vendor
+			importPath = cfg.BuildContext.VendoredLocalRootPath(importPath, srcDir, localRoot)
+			vendoredPath = "#/" + importPath
 		}
-		pkgSignature = build.DirToImportPath(filepath.Join(localRoot, importPath))
+		full := filepath.Join(localRoot, importPath)
+		pkgSignature = build.DirToImportPath(full)
+		stkPath = fmt.Sprintf("%s(%s)", path, full)
 	case style.IsGlobal(): //vendor?
 		switch {
 		case DebugDeprecatedImportcfg.enabled:
 			if d, i := DebugDeprecatedImportcfg.lookup(parent, path); d != "" {
-				debugDeprecatedImportcfgDir = d
+				debugDir = d
 				pkgSignature = i
 			}
 		case mode&UseVendor != 0:
-			vendor := VendoredImportPath(parent, path)
-			vendored = vendor != path
-			pkgSignature = vendor
+			vendoredPath = VendoredImportPath(parent, path)
+			pkgSignature = vendoredPath
 		}
-	default:
-		pkgSignature = path
 	}
-	return pkgSignature, debugDeprecatedImportcfgDir, vendored
+
+	//if `E:\localpackage\localroot\src\publics\public1` == srcDir {
+	//	fmt.Printf("GetPkgSignature path=%s,%s\nret=%s,%s,%s \nparent=%@#v\n", path, srcDir, pkgSignature, vendoredPath, debugDir, parent)
+	//}
+	return
 }
 
 // LoadImport scans the directory named by path, which must be an import path,
@@ -423,17 +422,16 @@ func GetPkgSignature(parent *Package, path, srcDir string, mode int) (importPath
 // with ./ or ../). A local relative path is interpreted relative to srcDir.
 // It returns a *Package describing the package found in that directory.
 func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPos []token.Position, mode int) *Package {
-	stk.Push(path)
-	defer stk.Pop()
 
 	origPath := path
 	style, _ := build.GetImportStyle(path)
-	pkgSignature, debugDeprecatedImportcfgDir, vendored := GetPkgSignature(parent, path, srcDir, mode)
-	if vendored {
-		path = pkgSignature
-	}
+	pkgSignature, vendoredPath, stkPath, debugDeprecatedImportcfgDir := GetPkgSignature(parent, path, srcDir, mode)
 
-	//fmt.Printf("LoadImport [%s][%s] pkgSignature=%s\n", path, srcDir, pkgSignature)
+	stk.Push(stkPath)
+	defer stk.Pop()
+
+	fmt.Printf("LoadImport [%s][%s] pkgSignature=%s vendoredPath=%s\n", path, srcDir, pkgSignature, vendoredPath)
+
 	p := packageCache[pkgSignature]
 	if p != nil {
 		p = reusePackage(p, stk)
@@ -451,18 +449,18 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 			bp, err = cfg.BuildContext.ImportDir(debugDeprecatedImportcfgDir, 0)
 		} else {
 			buildMode := build.ImportComment
-			if mode&UseVendor == 0 || vendored {
+			if mode&UseVendor == 0 || vendoredPath != path {
 				// Not vendoring, or we already found the vendored path.
 				buildMode |= build.IgnoreVendor
 			}
-			bp, err = cfg.BuildContext.Import(path, srcDir, buildMode)
+			bp, err = cfg.BuildContext.Import(vendoredPath, srcDir, buildMode)
 		}
 
 		if cfg.GOBIN != "" {
 			bp.BinDir = cfg.GOBIN
 		}
 		if debugDeprecatedImportcfgDir == "" && err == nil && !style.IsRelated() && bp.ImportComment != "" && bp.ImportComment != path &&
-			!strings.Contains(path, "/vendor/") && !strings.HasPrefix(path, "vendor/") {
+			!strings.Contains(vendoredPath, "/vendor/") && !strings.HasPrefix(vendoredPath, "vendor/") {
 			err = fmt.Errorf("code in directory %s expects import %q", bp.Dir, bp.ImportComment)
 		}
 		p.load(stk, bp, err)
@@ -821,7 +819,7 @@ func disallowVendorVisibility(srcDir string, p *Package, stk *ImportStack) *Pack
 		return p
 	}
 
-	//fmt.Printf("disallowVendorVisibility srcDir=[%s] ImportPath=[%s] Dir=[%s] parent=[%s] p=%@#v\n",srcDir, p.ImportPath, p.Dir, parent, p)
+	fmt.Printf("disallowVendorVisibility srcDir=[%s] ImportPath=[%s] Dir=[%s] parent=[%s] p=%@#v\n", srcDir, p.ImportPath, p.Dir, parent, p)
 
 	// Vendor is present, and srcDir is outside parent's tree. Not allowed.
 	perr := *p
@@ -1371,12 +1369,17 @@ func LoadPackage(arg string, stk *ImportStack) *Package {
 	// This lets you run go test ./ioutil in package io and be
 	// referring to io/ioutil rather than a hypothetical import of
 	// "./ioutil".
-	if build.IsLocalImport(arg) {
-		bp, _ := cfg.BuildContext.ImportDir(filepath.Join(base.Cwd, arg), build.FindOnly)
-		if bp.ImportPath != "" && bp.ImportPath != "." && bp.LocalRoot == "" { //Ally: if local root exists, it's not related to GoPath.
-			arg = bp.ImportPath
-		}
+	if arg != "" && arg[0] == '.' {
+		var fmt build.FormatImport
+		_ = fmt.FormatImportPath(&cfg.BuildContext, arg, base.Cwd)
+		arg = fmt.FmtImportPath
 	}
+	//	if build.IsLocalImport(arg) {
+	//		bp, _ := cfg.BuildContext.ImportDir(filepath.Join(base.Cwd, arg), build.FindOnly)
+	//		if bp.ImportPath != "" && bp.ImportPath != "." && bp.LocalRoot == "" { //Ally: if local root exists, it's not related to GoPath.
+	//			arg = bp.FmtImportPath
+	//		}
+	//	}
 
 	//Ally: load package from dir
 	return LoadImport(arg, base.Cwd, nil, stk, nil, 0)

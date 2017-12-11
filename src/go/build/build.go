@@ -512,7 +512,10 @@ func nameExt(name string) string {
 // *Package containing partial information.
 //
 func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Package, error) {
-	//fmt.Printf("Context.Import path=[%s] srcDir=[%s] mode=%d\n", path, srcDir, mode)
+	if path != "" && path[0] == '_' {
+		fmt.Printf("Context.Import path=[%s] srcDir=[%s] mode=%d\n", path, srcDir, mode)
+		panic(path + srcDir)
+	}
 
 	p := &Package{}
 
