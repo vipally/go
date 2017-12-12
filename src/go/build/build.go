@@ -394,6 +394,7 @@ type Package struct {
 	FmtImportPath string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
 	LocalRoot     string      // LocalRoot of imported package
 	Signature     string      // Signature of imported package, which is unique for every package Dir
+	SignatureView string      // Signature for view, which is unique for every package Dir
 	Type          PackageType // Type of FmtImportPath
 	Style         ImportStyle // import Style of FmtImportPath
 	IsVendor      bool        // From vendor path

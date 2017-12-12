@@ -101,8 +101,13 @@ type PackageInternal struct {
 	CmdlineFiles bool       // package built from files listed on command line
 	CmdlinePkg   bool       // package listed on command line
 
-	LocalRoot    string //Ally: root of local project(which contains sub-directory "vendor")
-	LocalPackage bool   //Ally: local packages that under LocalRoot which uses [import "#/xxx"] style reference or with [import "#"] comment
+	FmtImportPath string            // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
+	LocalRoot     string            // LocalRoot of imported package
+	Signature     string            // Signature of imported package, which is unique for every package Dir
+	SignatureView string            // Signature for view, which is unique for every package Dir
+	Type          build.PackageType // Type of FmtImportPath
+	Style         build.ImportStyle // import Style of FmtImportPath
+	IsVendor      bool              // From vendor path
 
 	Local       bool   // imported via local path (./ or ../)
 	LocalPrefix string // interpret ./ and ../ imports relative to this prefix
@@ -196,6 +201,14 @@ func (p *Package) copyBuild(pp *build.Package) {
 	p.Root = pp.Root
 	p.ConflictDir = pp.ConflictDir
 	p.BinaryOnly = pp.BinaryOnly
+
+	p.Internal.FmtImportPath = pp.FmtImportPath
+	p.Internal.LocalRoot = pp.LocalRoot
+	p.Internal.Signature = pp.Signature
+	p.Internal.SignatureView = pp.SignatureView
+	p.Internal.Type = pp.Type
+	p.Internal.Style = pp.Style
+	p.Internal.IsVendor = pp.IsVendor
 
 	// TODO? Target
 	p.Goroot = pp.Goroot
@@ -378,16 +391,18 @@ const (
 
 // GetPkgSignature returns the key of a import path from cache
 // It use a faster way to find the target package path than build.PackagePath.FindImport
-func GetPkgSignature(parent *Package, path, srcDir string, mode int) (pkgSignature, vendoredPath, stkPath, debugDir string) {
+func GetPkgSignature(parent *Package, path, srcDir string, mode int) (pkgSignature, vendoredPath, pkgSignatureView, debugDir string) {
 	pkgSignature = path
 	vendoredPath = path
-	stkPath = path
+	pkgSignatureView = path
 	debugDir = ""
 
 	style, _ := build.GetImportStyle(path) //ignore error
 	switch {
 	case style.IsRelated():
-		pkgSignature = build.DirToImportPath(filepath.Join(srcDir, path))
+		full := filepath.Join(srcDir, path)
+		pkgSignature = build.DirToImportPath(full)
+		pkgSignatureView = full
 	case style.IsLocalRoot():
 		localRoot := cfg.BuildContext.SearchLocalRoot(srcDir)
 		importPath := style.RealImportPath(path)
@@ -395,9 +410,9 @@ func GetPkgSignature(parent *Package, path, srcDir string, mode int) (pkgSignatu
 			importPath = cfg.BuildContext.VendoredLocalRootPath(importPath, srcDir, localRoot)
 			vendoredPath = "#/" + importPath
 		}
-		full := filepath.Join(localRoot, importPath)
+		full := filepath.Join(localRoot, "src", importPath)
 		pkgSignature = build.DirToImportPath(full)
-		stkPath = fmt.Sprintf("%s(%s)", path, full)
+		pkgSignatureView = fmt.Sprintf("%s(%s)", path, localRoot)
 	case style.IsGlobal(): //vendor?
 		switch {
 		case DebugDeprecatedImportcfg.enabled:
@@ -408,6 +423,7 @@ func GetPkgSignature(parent *Package, path, srcDir string, mode int) (pkgSignatu
 		case mode&UseVendor != 0:
 			vendoredPath = VendoredImportPath(parent, path)
 			pkgSignature = vendoredPath
+			pkgSignatureView = vendoredPath
 		}
 	}
 
@@ -462,6 +478,9 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 		if debugDeprecatedImportcfgDir == "" && err == nil && !style.IsRelated() && bp.ImportComment != "" && bp.ImportComment != path &&
 			!strings.Contains(vendoredPath, "/vendor/") && !strings.HasPrefix(vendoredPath, "vendor/") {
 			err = fmt.Errorf("code in directory %s expects import %q", bp.Dir, bp.ImportComment)
+		}
+		if pkgSignature != bp.Signature { //check signature
+			err = fmt.Errorf("import %q,%s, signature err: %s vs %@#v", path, srcDir, pkgSignature, bp)
 		}
 		p.load(stk, bp, err)
 		if p.Error != nil && p.Error.Pos == "" {
@@ -1469,11 +1488,11 @@ func PackagesForBuild(args []string) []*Package {
 	seen := map[string]bool{}
 	reported := map[string]bool{}
 	for _, pkg := range PackageList(pkgs) {
-		if seen[pkg.ImportPath] && !reported[pkg.ImportPath] {
-			reported[pkg.ImportPath] = true
+		if seen[pkg.ImportPath] && !reported[pkg.Internal.Signature] {
+			reported[pkg.Internal.Signature] = true
 			base.Errorf("internal error: duplicate loads of %s", pkg.ImportPath)
 		}
-		seen[pkg.ImportPath] = true
+		seen[pkg.Internal.Signature] = true
 	}
 	base.ExitIfErrors()
 

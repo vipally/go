@@ -149,6 +149,7 @@ type PackagePath struct {
 	FmtImportPath    string      // formated import path. like: "#/x/y/z" "x/y/z", full path like "c:\x\y\z" for standalone packages
 	LocalRoot        string      // LocalRoot of imported package
 	Signature        string      // Signature of imported package, which is unique for every package Dir
+	SignatureView    string      // Signature for view, which is unique for every package Dir
 	Type             PackageType // Type of formated ImportPath
 	Style            ImportStyle // Style of formated ImportPath
 	IsVendor         bool        // From vendor path
@@ -402,6 +403,7 @@ func (p *Package) copyFromPackagePath(ctxt *Context, pp *PackagePath) error {
 
 	p.FmtImportPath = pp.FmtImportPath
 	p.Signature = pp.Signature
+	p.SignatureView = pp.SignatureView
 	p.IsVendor = pp.IsVendor
 	p.Type = pp.Type
 	p.Style = pp.Style
@@ -721,10 +723,16 @@ func (ctxt *Context) matchVendorFromRoot(imported, srcDir, root, localRoot strin
 // which is unique for every dir
 func (p *PackagePath) genSignature() {
 	switch {
-	case !p.Type.IsValid() || p.Type.IsStandAlonePackage() || p.Type.IsLocalPackage():
+	case !p.Type.IsValid() || p.Type.IsStandAlonePackage():
 		p.Signature = DirToImportPath(p.Dir)
+		p.SignatureView = p.Signature
+		p.ImportPath = p.Signature
+	case p.Type.IsLocalPackage():
+		p.Signature = DirToImportPath(p.Dir)
+		p.SignatureView = fmt.Sprintf("#s(%s)", p.FmtImportPath, p.LocalRoot)
 	default:
 		p.Signature = p.Style.RealImportPath(p.ImportPath)
+		p.SignatureView = p.Signature
 	}
 }
 
