@@ -369,6 +369,8 @@ type moduledata struct {
 	end, gcdata, gcbss    uintptr
 	types, etypes         uintptr
 
+	buildtimestamp int64 //build timestamp, format time.Time.Uinx
+
 	textsectmap []textsect
 	typelinks   []int32 // offsets from types
 	itablinks   []*itab
@@ -390,6 +392,12 @@ type moduledata struct {
 	bad bool // module failed to load and should be ignored
 
 	next *moduledata
+}
+
+// BuildTimestamp returns the compile timestamp of the executable.
+// Which is set by linker, and format as time.Now.Unix.
+func BuildTimestamp() int64 {
+	return firstmoduledata.buildtimestamp
 }
 
 // A modulehash is used to compare the ABI of a new module or a

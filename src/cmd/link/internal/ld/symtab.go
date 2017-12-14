@@ -39,6 +39,14 @@ import (
 	"strings"
 )
 
+//build timestamp
+var buildTimestamp int64 = 1234
+
+// SetBuildTimestamp change build timestamp from linker
+func SetBuildTimestamp(timestamp int64) {
+	buildTimestamp = timestamp
+}
+
 // Symbol table.
 
 func putelfstr(s string) int {
@@ -555,6 +563,9 @@ func (ctxt *Link) symtab() {
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.gcbss", 0))
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.types", 0))
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.etypes", 0))
+
+	//buildtimestamp int64, build timestamp, format time.Time.Uinx
+	moduledata.AddUint(ctxt.Arch, uint64(buildTimestamp))
 
 	// text section information
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.textsectionmap", 0))

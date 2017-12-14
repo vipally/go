@@ -12,11 +12,6 @@ package runtime
 
 import _ "unsafe" // for go:linkname
 
-const (
-	//build const, rewrite by compiler timestamp
-	_build_DateTimeStamp uint32 = 0
-)
-
 func walltime() (sec int64, nsec int32)
 
 //go:linkname time_now time.now
