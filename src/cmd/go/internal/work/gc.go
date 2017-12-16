@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	//"time"
 
 	"cmd/go/internal/base"
 	"cmd/go/internal/cfg"
@@ -401,7 +402,7 @@ func pluginPath(a *Action) string {
 }
 
 func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) error {
-	fmt.Printf("gcToolchain.ld %@#v %@#v")
+	//fmt.Printf("gcToolchain.ld %s %s %s\n %@#v\n %@#v\n", out, importcfg, mainpkg, b, root)
 	cxx := len(root.Package.CXXFiles) > 0 || len(root.Package.SwigCXXFiles) > 0
 	for _, a := range root.Deps {
 		if a.Package != nil && (len(a.Package.CXXFiles) > 0 || len(a.Package.SwigCXXFiles) > 0) {
@@ -429,6 +430,9 @@ func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) 
 	if root.Package.Goroot && strings.HasPrefix(root.Package.ImportPath, "cmd/") {
 		ldflags = append(ldflags, "-X=cmd/internal/objabi.buildID="+root.buildID)
 	}
+
+	//set runtime.buildtimestamp int64 by linker
+	ldflags = append(ldflags, fmt.Sprintf("-X=runtime.buildtimestamp=%d", runtime.UnixNow()))
 
 	// If the user has not specified the -extld option, then specify the
 	// appropriate linker. In case of C++ code, use the compiler named

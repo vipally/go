@@ -7,7 +7,6 @@ package runtime
 import (
 	"runtime/internal/atomic"
 	"runtime/internal/sys"
-	"strconv"
 	"unsafe"
 )
 

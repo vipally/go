@@ -403,6 +403,7 @@ func (b *Builder) VetAction(mode, depMode BuildMode, p *load.Package) *Action {
 // and possibly installing the result (according to mode).
 // depMode is the action (build or install) to use when compiling dependencies.
 func (b *Builder) LinkAction(mode, depMode BuildMode, p *load.Package) *Action {
+	//fmt.Printf("LinkAction %v %v %@#v\n", mode, depMode, p)
 	// Construct link action.
 	a := b.cacheAction("link", p, func() *Action {
 		a := &Action{

@@ -812,8 +812,8 @@ func addstrdata(ctxt *Link, name string, value string) {
 			s := ctxt.Syms.Lookup(name, 0)
 			s.Attr |= sym.AttrReachable
 			s.Type = sym.SRODATA
-			s.AddUint64(ctxt.Arch, i)
-			println("set runtime.buildtimestamp:", v)
+			s.AddUint64(ctxt.Arch, uint64(v))
+			//println("set runtime.buildtimestamp:", v)
 		} else {
 			Exitf("-X %s=%s error:%s", name, value, err.Error())
 		}
