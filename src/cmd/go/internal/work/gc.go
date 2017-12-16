@@ -401,6 +401,7 @@ func pluginPath(a *Action) string {
 }
 
 func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) error {
+	fmt.Printf("gcToolchain.ld %@#v %@#v")
 	cxx := len(root.Package.CXXFiles) > 0 || len(root.Package.SwigCXXFiles) > 0
 	for _, a := range root.Deps {
 		if a.Package != nil && (len(a.Package.CXXFiles) > 0 || len(a.Package.SwigCXXFiles) > 0) {

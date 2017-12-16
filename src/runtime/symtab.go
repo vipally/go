@@ -7,6 +7,7 @@ package runtime
 import (
 	"runtime/internal/atomic"
 	"runtime/internal/sys"
+	"strconv"
 	"unsafe"
 )
 
@@ -369,7 +370,7 @@ type moduledata struct {
 	end, gcdata, gcbss    uintptr
 	types, etypes         uintptr
 
-	buildtimestamp int64 //build timestamp, format time.Time.Uinx
+	//buildtimestamp int64 //build timestamp, format time.Time.Uinx
 
 	textsectmap []textsect
 	typelinks   []int32 // offsets from types
@@ -394,11 +395,26 @@ type moduledata struct {
 	next *moduledata
 }
 
+var buildtimestamp int64
+
 // BuildTimestamp returns the compile timestamp of the executable.
 // Which is set by linker, and format as time.Now.Unix.
 func BuildTimestamp() int64 {
-	return firstmoduledata.buildtimestamp
+	return buildtimestamp
 }
+
+// UnixNow returns the seconds of unix time, which is the same as time.Now.Unix
+func UnixNow() int64 {
+	sec, nsec, _ := time_now()
+	unixNow := (sec*1e9 + int64(nsec)) / 1e9
+	return unixNow
+}
+
+//// BuildTimestamp returns the compile timestamp of the executable.
+//// Which is set by linker, and format as time.Now.Unix.
+//func BuildTimestamp() int64 {
+//	return firstmoduledata.buildtimestamp
+//}
 
 // A modulehash is used to compare the ABI of a new module or a
 // package in a new module with the loaded program.

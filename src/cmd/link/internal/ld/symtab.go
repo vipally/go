@@ -38,7 +38,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
+	//"time"
 )
 
 // Symbol table.
@@ -559,7 +559,7 @@ func (ctxt *Link) symtab() {
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.etypes", 0))
 
 	//buildtimestamp int64, build timestamp, format time.Time.Uinx
-	moduledata.AddUint64(ctxt.Arch, uint64(time.Now().Unix()))
+	//moduledata.AddUint64(ctxt.Arch, uint64(time.Now().Unix()))
 
 	// text section information
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.textsectionmap", 0))

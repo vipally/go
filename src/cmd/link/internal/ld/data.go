@@ -806,6 +806,20 @@ func addstrdata1(ctxt *Link, arg string) {
 }
 
 func addstrdata(ctxt *Link, name string, value string) {
+	//runtime.buildtimestamp int64
+	if name == "runtime.buildtimestamp" {
+		if v, err := strconv.ParseInt(value, 0, 64); err == nil {
+			s := ctxt.Syms.Lookup(name, 0)
+			s.Attr |= sym.AttrReachable
+			s.Type = sym.SRODATA
+			s.AddUint64(ctxt.Arch, i)
+			println("set runtime.buildtimestamp:", v)
+		} else {
+			Exitf("-X %s=%s error:%s", name, value, err.Error())
+		}
+		return
+	}
+
 	p := fmt.Sprintf("%s.str", name)
 	sp := ctxt.Syms.Lookup(p, 0)
 
