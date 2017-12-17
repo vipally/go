@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 	//"time"
 
 	"cmd/go/internal/base"
@@ -432,7 +433,7 @@ func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) 
 	}
 
 	//set runtime.buildtimestamp int64 by linker
-	ldflags = append(ldflags, fmt.Sprintf("-X=runtime.buildtimestamp=%d", runtime.UnixNow()))
+	ldflags = append(ldflags, fmt.Sprintf("-X=runtime.buildtimestamp=%d", time.Now().Unix()))
 
 	// If the user has not specified the -extld option, then specify the
 	// appropriate linker. In case of C++ code, use the compiler named

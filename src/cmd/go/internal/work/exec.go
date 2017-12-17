@@ -1420,7 +1420,9 @@ func (b *Builder) runOut(dir string, desc string, env []string, cmdargs ...inter
 
 	var buf bytes.Buffer
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
-	//fmt.Printf("cmdline:%@#v\n", cmdline)
+	//	if strings.HasSuffix(cmdline[0], "link.exe") {
+	//		fmt.Printf("cmdline:%@#v\n", cmdline)
+	//	}
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	cmd.Dir = dir

@@ -159,6 +159,8 @@ func Main(arch *sys.Arch, theArch Arch) {
 
 	libinit(ctxt) // creates outfile
 
+	writeruntimebuildtimestamp(ctxt) //write runtime.buildtimestamp
+
 	if ctxt.HeadType == objabi.Hunknown {
 		ctxt.HeadType.Set(objabi.GOOS)
 	}
