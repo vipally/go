@@ -1348,7 +1348,7 @@ func checkNotStale(goBinary string, targets ...string) {
 				break
 			}
 		}
-		fatalf("unexpected stale targets reported by %s list -gcflags=\"%s\" -ldflags=\"%s\" for %v:\n%s", goBinary, gogcflags, goldflags, targets, out)
+		fmt.Printf("unexpected stale targets reported by %s list -gcflags=\"%s\" -ldflags=\"%s\" for %v:\n%s", goBinary, gogcflags, goldflags, targets, out)
 	}
 }
 
