@@ -759,10 +759,10 @@ func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) 
 		//it will never happen except error inner usage, so use panic
 		panic("unknown value set:" + kind.String())
 	}
-	if newLine {
-		if !empty {
-			depth++ //have element, increase depth
-		}
+	if newLine && !empty {
+		// aways increase depth for element,
+		// p.newLineIfRequire will decrease it if empty
+		depth++
 		p.newLineIfRequire(depth, empty)
 	}
 
@@ -785,7 +785,7 @@ func (p *pp) writeElemSeparator(newLine, last bool, depth int) {
 }
 
 // write tail of a value set(struct, map, slice, array)
-func (p *pp) writeValueSetTail(kind reflect.Kind) {
+func (p *pp) writeValueSetTail(kind reflect.Kind, depth int) {
 	switch kind {
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
 		if kind == reflect.Struct || p.fmt.sharpV {
@@ -796,6 +796,9 @@ func (p *pp) writeValueSetTail(kind reflect.Kind) {
 	default:
 		//it will never happen except error inner usage, so use panic
 		panic("unknown value set:" + kind.String())
+	}
+	if depth == 0 {
+		p.newLineIfRequire(depth, true)
 	}
 }
 
@@ -855,7 +858,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.printValue(f.MapIndex(key), verb, depth+1)
 			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' ' or newLine
 		}
-		p.writeValueSetTail(f.Kind())
+		p.writeValueSetTail(f.Kind(), depth)
 
 	case reflect.Struct:
 		numField := f.NumField()
@@ -875,7 +878,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			p.printValue(getField(f, i), verb, depth+1)
 			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' ' or newLine
 		}
-		p.writeValueSetTail(f.Kind())
+		p.writeValueSetTail(f.Kind(), depth)
 
 	case reflect.Array, reflect.Slice:
 		switch verb {
@@ -913,7 +916,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				newLine := firstNewLine && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
 				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' ' or newLine
 			}
-			p.writeValueSetTail(f.Kind())
+			p.writeValueSetTail(f.Kind(), depth)
 		}
 
 	case reflect.Interface:

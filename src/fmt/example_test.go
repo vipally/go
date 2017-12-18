@@ -102,6 +102,7 @@ func ExamplePrintf_flagV() {
 	//         abc: 456
 	//     ]
 	// }
+	//
 	// -------
 	// "%#v":
 	// fmt_test.Z{G:fmt_test.Y{D:fmt_test.X{A:123, B:"\"b\" = 1"}, E:[]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, F:[2]string{"aaa", "bbb"}}, H:"zzz", I:[]string{"c:\\x\\y\\z", "d:\\a\\b\\c"}, J:map[string]int{"abc":456}}
@@ -131,6 +132,7 @@ func ExamplePrintf_flagV() {
 	//         `abc`: 456,
 	//     },
 	// }
+	//
 	// -------
 	// "%+v":
 	// {G:{D:{A:123 B:"b" = 1} E:[1 2 3 4 5 6 7 8 9 10 11 12] F:[aaa bbb]} H:zzz I:[c:\x\y\z d:\a\b\c] J:map[abc:456]}
@@ -160,4 +162,5 @@ func ExamplePrintf_flagV() {
 	//         abc: 456
 	//     ]
 	// }
+	//
 }
