@@ -286,6 +286,8 @@ func (b *Builder) useCache(a *Action, p *load.Package, actionHash cache.ActionID
 			a.Target = "DO NOT USE - " + a.Mode
 			return true
 		}
+
+		fmt.Printf("useCache id mismatch %s actionID=%s readactionID=%s target=%s\n", p.ImportPath, actionID, buildID, target)
 	}
 
 	// Special case for building a main package: if the only thing we

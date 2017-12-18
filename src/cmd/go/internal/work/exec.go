@@ -278,6 +278,8 @@ func (b *Builder) buildActionID(a *Action) cache.ActionID {
 		}
 	}
 
+	fmt.Printf("buildActionID [%s]=[%X]\n", a.Package.ImportPath, h.Sum())
+
 	return h.Sum()
 }
 
