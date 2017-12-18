@@ -346,6 +346,7 @@ func (b *Builder) useCache(a *Action, p *load.Package, actionHash cache.ActionID
 					if p1.Stale && p1.StaleReason != "" {
 						if strings.HasPrefix(p1.StaleReason, "stale dependency: ") {
 							p.StaleReason = p1.StaleReason
+							fmt.Printf("ComputeStaleOnly0 p=%@#v\np1=%@#v\n", p, p1)
 							break
 						}
 						if strings.HasPrefix(p.StaleReason, "build ID mismatch") {
@@ -355,6 +356,7 @@ func (b *Builder) useCache(a *Action, p *load.Package, actionHash cache.ActionID
 				}
 			}
 		}
+		fmt.Printf("ComputeStaleOnly %@#v\n", p)
 		return true
 	}
 

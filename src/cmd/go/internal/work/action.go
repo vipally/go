@@ -30,6 +30,7 @@ import (
 // It does not hold per-package state, because we
 // build packages in parallel, and the builder is shared.
 type Builder struct {
+	DebugStale  bool
 	WorkDir     string               // the temporary work directory (ends in filepath.Separator)
 	actionCache map[cacheKey]*Action // a cache of already-constructed actions
 	mkdirCache  map[string]bool      // a cache of created directories

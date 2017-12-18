@@ -760,9 +760,9 @@ func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) 
 		panic("unknown value set:" + kind.String())
 	}
 	if newLine {
-		if !empty {
-			depth++ //have element, increase depth
-		}
+		// aways increase depth for element,
+		// if empty p.newLineIfRequire will decrease it
+		depth++
 		p.newLineIfRequire(depth, empty)
 	}
 
