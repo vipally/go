@@ -1229,7 +1229,7 @@ func TestSprintf(t *testing.T) {
 				// It's too confusing to read the errors.
 				t.Errorf("Sprintf(%q, %q) = <%s> want <%s>", tt.fmt, tt.val, s, tt.out)
 			} else {
-				t.Errorf("Sprintf(%q, %v) = %q},\n want %q\n%s", tt.fmt, tt.val, s, tt.out, s)
+				t.Errorf("Sprintf(%q, %v) = %q},\n want %q", tt.fmt, tt.val, s, tt.out)
 			}
 		}
 	}
