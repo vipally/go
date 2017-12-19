@@ -1329,3 +1329,21 @@ func TestReadFileLimit(t *testing.T) {
 		t.Errorf("readFile(%q) error = %v; want error containing 'is too large'", zero, err)
 	}
 }
+
+func TestBuildTime(t *testing.T) {
+	now := Now()
+	unixNow := runtime.UnixNow()
+	buildTime := BuidTime()
+	buildTimestamp := runtime.BuildTimestamp()
+	dur := now.Sub(buildTime)
+
+	if buildTimestamp != buildTime.Unix() {
+		t.Errorf("BuildTimestamp not match: runtime.BuildTimestamp()=%d time.BuidTime().Unix()=%d", buildTimestamp, buildTime.Unix())
+	}
+	if unixNow != now.Unix() {
+		t.Errorf("UnixNow not match: runtime.UnixNow()=%d time.Now().Unix()=%d", buildTimestamp, buildTime.Unix())
+	}
+	if dur > Minute {
+		t.Errorf("Cost too much duration:%s time.Now()=%s time.BuildTime()=%s", dur, now, buildTime)
+	}
+}
