@@ -10,6 +10,9 @@ import (
 	"unsafe"
 )
 
+//type of goroutin priority
+type priorityType = int32
+
 // defined constants
 const (
 	// G status
@@ -304,10 +307,11 @@ type sudog struct {
 	acquiretime int64
 	releasetime int64
 	ticket      uint32
-	parent      *sudog // semaRoot binary tree
-	waitlink    *sudog // g.waiting list or semaRoot
-	waittail    *sudog // semaRoot
-	c           *hchan // channel
+	parent      *sudog       // semaRoot binary tree
+	waitlink    *sudog       // g.waiting list or semaRoot
+	waittail    *sudog       // semaRoot
+	c           *hchan       // channel
+	priority    priorityType // Ally:this is the priority of waitlink, used by queuePriority
 }
 
 type libcall struct {
@@ -386,7 +390,9 @@ type g struct {
 	labels         unsafe.Pointer // profiler labels
 	timer          *timer         // cached timer for time.Sleep
 	selectDone     uint32         // are we participating in a select and did someone win the race?
-	priority       uint32         //Ally: priority of g in sched.waitlist
+
+	priority priorityType //Ally:priority of g in sched.waitlist
+
 	// Per-G GC state
 
 	// gcAssistBytes is this G's GC assist credit in terms of
@@ -580,9 +586,9 @@ type schedt struct {
 
 	// Ally:Global wait queue.
 	// g list that cannot run now, and must wait other g run and release them.
-	waitqhead guintptr
-	waitqtail guintptr
-	waitqsize int32
+	//waitqhead guintptr
+	//waitqtail guintptr
+	//waitqsize int32
 
 	// Global cache of dead G's.
 	gflock       mutex

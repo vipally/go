@@ -190,73 +190,73 @@ func GetGoroutineId() int64 {
 	return getg().goid
 }
 
-func GoschedWait(priority uint32) {
-	_g_ := getg()
-	_g_.priority = priority
-	mcall(gosched_wait)
-}
-func goschedWaitRelease() {
-	lock(&sched.lock)
-	globwaitqrelease()
-	unlock(&sched.lock)
-}
+//func GoschedWait(priority uint32) {
+//	_g_ := getg()
+//	_g_.priority = priority
+//	mcall(gosched_wait)
+//}
+//func goschedWaitRelease() {
+//	lock(&sched.lock)
+//	globwaitqrelease()
+//	unlock(&sched.lock)
+//}
 
-func gosched_wait(gp *g) {
-	if trace.enabled {
-		traceGoSched()
-	}
-	goschedWaitImpl(gp)
-}
+//func gosched_wait(gp *g) {
+//	if trace.enabled {
+//		traceGoSched()
+//	}
+//	goschedWaitImpl(gp)
+//}
 
-func goschedWaitImpl(gp *g) {
-	println("goschedWaitImpl", gp.goid, "wait size=", sched.waitqsize)
-	status := readgstatus(gp)
-	if status&^_Gscan != _Grunning {
-		dumpgstatus(gp)
-		throw("bad g status")
-	}
-	casgstatus(gp, _Grunning, _Gwaiting)
-	dropg()
-	lock(&sched.lock)
-	globwaitqput(gp)
-	unlock(&sched.lock)
+//func goschedWaitImpl(gp *g) {
+//	println("goschedWaitImpl", gp.goid, "wait size=", sched.waitqsize)
+//	status := readgstatus(gp)
+//	if status&^_Gscan != _Grunning {
+//		dumpgstatus(gp)
+//		throw("bad g status")
+//	}
+//	casgstatus(gp, _Grunning, _Gwaiting)
+//	dropg()
+//	lock(&sched.lock)
+//	globwaitqput(gp)
+//	unlock(&sched.lock)
 
-	releasem(acquirem()) //added
+//	releasem(acquirem()) //added
 
-	//schedule(true)
-}
+//	//schedule(true)
+//}
 
-func globwaitqput(gp *g) {
-	gp.schedlink = 0
-	if sched.waitqtail != 0 {
-		sched.waitqtail.ptr().schedlink.set(gp)
-	} else {
-		sched.waitqhead.set(gp)
-	}
-	sched.waitqtail.set(gp)
-	sched.waitqsize++
-}
+//func globwaitqput(gp *g) {
+//	gp.schedlink = 0
+//	if sched.waitqtail != 0 {
+//		sched.waitqtail.ptr().schedlink.set(gp)
+//	} else {
+//		sched.waitqhead.set(gp)
+//	}
+//	sched.waitqtail.set(gp)
+//	sched.waitqsize++
+//}
 
-func globwaitqrelease() {
-	println("globwaitqrelease ", "wait size=", sched.waitqsize)
-	h := sched.waitqhead.ptr()
-	t := sched.waitqtail.ptr()
-	size := sched.waitqsize
-	if h == nil {
-		return
-	}
-	for p := sched.waitqhead.ptr(); p != nil; p = p.schedlink.ptr() {
-		casgstatus(p, _Gwaiting, _Grunnable)
-	}
-	if sched.runqtail != 0 {
-		sched.runqtail.ptr().schedlink.set(h)
-	} else {
-		sched.runqhead.set(h)
-	}
-	sched.runqtail.set(t)
-	sched.runqsize += size
+//func globwaitqrelease() {
+//	println("globwaitqrelease ", "wait size=", sched.waitqsize)
+//	h := sched.waitqhead.ptr()
+//	t := sched.waitqtail.ptr()
+//	size := sched.waitqsize
+//	if h == nil {
+//		return
+//	}
+//	for p := sched.waitqhead.ptr(); p != nil; p = p.schedlink.ptr() {
+//		casgstatus(p, _Gwaiting, _Grunnable)
+//	}
+//	if sched.runqtail != 0 {
+//		sched.runqtail.ptr().schedlink.set(h)
+//	} else {
+//		sched.runqhead.set(h)
+//	}
+//	sched.runqtail.set(t)
+//	sched.runqsize += size
 
-	sched.waitqhead = 0
-	sched.waitqtail = 0
-	sched.waitqsize = 0
-}
+//	sched.waitqhead = 0
+//	sched.waitqtail = 0
+//	sched.waitqsize = 0
+//}
