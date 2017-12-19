@@ -929,6 +929,11 @@ func builderTest(b *work.Builder, p *load.Package) (buildAction, runAction, prin
 		Internal: load.PackageInternal{
 			Build:     &build.Package{Name: "main"},
 			OmitDebug: !testC && !testNeedBinary,
+
+			Asmflags:   p.Internal.Asmflags,
+			Gcflags:    p.Internal.Gcflags,
+			Ldflags:    p.Internal.Ldflags,
+			Gccgoflags: p.Internal.Gccgoflags,
 		},
 	}
 
@@ -1082,7 +1087,7 @@ func builderTest(b *work.Builder, p *load.Package) (buildAction, runAction, prin
 			Func:       c.builderRunTest,
 			Deps:       []*work.Action{buildAction},
 			Package:    p,
-			IgnoreFail: true,
+			IgnoreFail: true, // run (prepare output) even if build failed
 			TryCache:   c.tryCache,
 			Objdir:     testDir,
 		}
@@ -1093,17 +1098,19 @@ func builderTest(b *work.Builder, p *load.Package) (buildAction, runAction, prin
 			addTestVet(b, pxtest, runAction, installAction)
 		}
 		cleanAction = &work.Action{
-			Mode:    "test clean",
-			Func:    builderCleanTest,
-			Deps:    []*work.Action{runAction},
-			Package: p,
-			Objdir:  testDir,
+			Mode:       "test clean",
+			Func:       builderCleanTest,
+			Deps:       []*work.Action{runAction},
+			Package:    p,
+			IgnoreFail: true, // clean even if test failed
+			Objdir:     testDir,
 		}
 		printAction = &work.Action{
-			Mode:    "test print",
-			Func:    builderPrintTest,
-			Deps:    []*work.Action{cleanAction},
-			Package: p,
+			Mode:       "test print",
+			Func:       builderPrintTest,
+			Deps:       []*work.Action{cleanAction},
+			Package:    p,
+			IgnoreFail: true, // print even if test failed
 		}
 	}
 	if installAction != nil {
@@ -1265,11 +1272,12 @@ func (c *runCache) builderRunTest(b *work.Builder, a *work.Action) error {
 		return nil
 	}
 
+	execCmd := work.FindExecCmd()
 	testlogArg := []string{}
-	if !c.disableCache && cfg.Goos != "nacl" {
+	if !c.disableCache && len(execCmd) == 0 {
 		testlogArg = []string{"-test.testlogfile=" + a.Objdir + "testlog.txt"}
 	}
-	args := str.StringList(work.FindExecCmd(), a.Deps[0].Target, testlogArg, testArgs)
+	args := str.StringList(execCmd, a.Deps[0].Target, testlogArg, testArgs)
 
 	if testCoverProfile != "" {
 		// Write coverage to temporary profile, for merging later.

@@ -224,7 +224,7 @@ func testgo(t *testing.T) *testgoData {
 	testenv.MustHaveGoBuild(t)
 
 	if skipExternal {
-		t.Skip("skipping external tests on %s/%s", runtime.GOOS, runtime.GOARCH)
+		t.Skipf("skipping external tests on %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 
 	return &testgoData{t: t}
@@ -2284,7 +2284,7 @@ func TestSymlinkWarning(t *testing.T) {
 	tg.tempDir("yy/zz")
 	tg.tempFile("yy/zz/zz.go", "package zz\n")
 	if err := os.Symlink(tg.path("yy"), tg.path("src/example/xx/yy")); err != nil {
-		t.Skip("symlink failed: %v", err)
+		t.Skipf("symlink failed: %v", err)
 	}
 	tg.run("list", "example/xx/z...")
 	tg.grepStdoutNot(".", "list should not have matched anything")
@@ -2980,6 +2980,18 @@ func TestGoTestMainAsNormalTest(t *testing.T) {
 	defer tg.cleanup()
 	tg.run("test", "testdata/standalone_main_normal_test.go")
 	tg.grepBoth(okPattern, "go test did not say ok")
+}
+
+func TestGoTestMainTwice(t *testing.T) {
+	tg := testgo(t)
+	defer tg.cleanup()
+	tg.makeTempdir()
+	tg.setenv("GOCACHE", tg.tempdir)
+	tg.setenv("GOPATH", filepath.Join(tg.pwd(), "testdata"))
+	tg.run("test", "-v", "multimain")
+	if strings.Count(tg.getStdout(), "notwithstanding") != 2 {
+		t.Fatal("tests did not run twice")
+	}
 }
 
 func TestGoTestFlagsAfterPackage(t *testing.T) {
@@ -5263,6 +5275,10 @@ func TestTestVet(t *testing.T) {
 
 	tg.setenv("GOPATH", filepath.Join(tg.pwd(), "testdata"))
 	tg.run("test", "vetcycle") // must not fail; #22890
+
+	tg.runFail("test", "vetfail/...")
+	tg.grepStderr(`Printf format %d`, "did not diagnose bad Printf")
+	tg.grepStdout(`ok\s+vetfail/p2`, "did not run vetfail/p2")
 }
 
 func TestInstallDeps(t *testing.T) {
@@ -5343,11 +5359,13 @@ func TestGcflagsPatterns(t *testing.T) {
 	tg.grepStderr("compile.* -N .*-p reflect", "did not build reflect with -N flag")
 	tg.grepStderrNot("compile.* -N .*-p fmt", "incorrectly built fmt with -N flag")
 
-	tg.run("test", "-c", "-n", "-gcflags=-N", "strings")
-	tg.grepStderr("compile.* -N .*compare_test.go", "did not build strings_test package with -N flag")
+	tg.run("test", "-c", "-n", "-gcflags=-N", "-ldflags=-X=x.y=z", "strings")
+	tg.grepStderr("compile.* -N .*compare_test.go", "did not compile strings_test package with -N flag")
+	tg.grepStderr("link.* -X=x.y=z", "did not link strings.test binary with -X flag")
 
-	tg.run("test", "-c", "-n", "-gcflags=strings=-N", "strings")
-	tg.grepStderr("compile.* -N .*compare_test.go", "did not build strings_test package with -N flag")
+	tg.run("test", "-c", "-n", "-gcflags=strings=-N", "-ldflags=strings=-X=x.y=z", "strings")
+	tg.grepStderr("compile.* -N .*compare_test.go", "did not compile strings_test package with -N flag")
+	tg.grepStderr("link.* -X=x.y=z", "did not link strings.test binary with -X flag")
 }
 
 func TestGoTestMinusN(t *testing.T) {

@@ -520,7 +520,8 @@ func (c *common) Failed() bool {
 }
 
 // FailNow marks the function as having failed and stops its execution
-// by calling runtime.Goexit.
+// by calling runtime.Goexit (which then runs all deferred calls in the
+// current goroutine).
 // Execution will continue at the next test or benchmark.
 // FailNow must be called from the goroutine running the
 // test or benchmark function, not from other goroutines
@@ -781,9 +782,9 @@ func tRunner(t *T, fn func(t *T)) {
 	t.finished = true
 }
 
-// Run runs f as a subtest of t called name. It reports whether f succeeded. Run
-// runs f in a separate goroutine and will block until all its parallel subtests
-// have completed.
+// Run runs f as a subtest of t called name. It runs f in a separate goroutine
+// and blocks until f returns or calls t.Parallel to become a parallel test.
+// Run reports whether f succeeded (or at least did not fail before calling t.Parallel).
 //
 // Run may be called simultaneously from multiple goroutines, but all such calls
 // must return before the outer test function for t returns.
@@ -913,6 +914,8 @@ type M struct {
 
 	timer     *time.Timer
 	afterOnce sync.Once
+
+	numRun int
 }
 
 // testDeps is an internal interface of functionality that is
@@ -944,6 +947,12 @@ func MainStart(deps testDeps, tests []InternalTest, benchmarks []InternalBenchma
 
 // Run runs the tests. It returns an exit code to pass to os.Exit.
 func (m *M) Run() int {
+	// Count the number of calls to m.Run.
+	// We only ever expected 1, but we didn't enforce that,
+	// and now there are tests in the wild that call m.Run multiple times.
+	// Sigh. golang.org/issue/23129.
+	m.numRun++
+
 	// TestMain may have already called flag.Parse.
 	if !flag.Parsed() {
 		flag.Parse()
@@ -1109,7 +1118,16 @@ func (m *M) before() {
 	if *testlog != "" {
 		// Note: Not using toOutputDir.
 		// This file is for use by cmd/go, not users.
-		f, err := os.Create(*testlog)
+		var f *os.File
+		var err error
+		if m.numRun == 1 {
+			f, err = os.Create(*testlog)
+		} else {
+			f, err = os.OpenFile(*testlog, os.O_WRONLY, 0)
+			if err == nil {
+				f.Seek(0, io.SeekEnd)
+			}
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "testing: %s\n", err)
 			os.Exit(2)
