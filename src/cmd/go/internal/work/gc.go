@@ -16,7 +16,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	//"time"
 
 	"cmd/go/internal/base"
 	"cmd/go/internal/cfg"
@@ -403,7 +402,6 @@ func pluginPath(a *Action) string {
 }
 
 func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) error {
-	//fmt.Printf("gcToolchain.ld %s %s %s\n %@#v\n %@#v\n", out, importcfg, mainpkg, b, root)
 	cxx := len(root.Package.CXXFiles) > 0 || len(root.Package.SwigCXXFiles) > 0
 	for _, a := range root.Deps {
 		if a.Package != nil && (len(a.Package.CXXFiles) > 0 || len(a.Package.SwigCXXFiles) > 0) {

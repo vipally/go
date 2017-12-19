@@ -34,11 +34,9 @@ import (
 	"cmd/internal/objabi"
 	"cmd/internal/sys"
 	"cmd/link/internal/sym"
-	//"cmd/link/internal/unixtime"
 	"fmt"
 	"path/filepath"
 	"strings"
-	//"time"
 )
 
 // Symbol table.
@@ -557,9 +555,6 @@ func (ctxt *Link) symtab() {
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.gcbss", 0))
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.types", 0))
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.etypes", 0))
-
-	//buildtimestamp int64, build timestamp, format time.Time.Uinx
-	//moduledata.AddUint64(ctxt.Arch, uint64(time.Now().Unix()))
 
 	// text section information
 	moduledata.AddAddr(ctxt.Arch, ctxt.Syms.Lookup("runtime.textsectionmap", 0))

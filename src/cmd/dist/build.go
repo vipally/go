@@ -1312,10 +1312,6 @@ func cmdbootstrap() {
 }
 
 func goInstall(goBinary string, args ...string) {
-	//println("goInstall ", goBinary)
-	//	for _, v := range args {
-	//		println("    ", v)
-	//	}
 	installCmd := []string{goBinary, "install", "-gcflags=all=" + gogcflags, "-ldflags=all=" + goldflags}
 	if vflag > 0 {
 		installCmd = append(installCmd, "-v")
@@ -1330,10 +1326,6 @@ func goInstall(goBinary string, args ...string) {
 }
 
 func checkNotStale(goBinary string, targets ...string) {
-	//	println("checkNotStale", goBinary)
-	//	for _, v := range targets {
-	//		println("    ", v)
-	//	}
 	out := run(goroot, CheckExit,
 		append([]string{
 			goBinary,

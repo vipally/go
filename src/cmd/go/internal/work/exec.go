@@ -278,11 +278,6 @@ func (b *Builder) buildActionID(a *Action) cache.ActionID {
 		}
 	}
 
-	//	fmt.Printf("buildActionID [%s]=[%X]\n", a.Package.ImportPath, h.Sum())
-	//	if p.ImportPath == "runtime/internal/sys" || strings.HasPrefix(p.ImportPath, "cmd/") {
-	//		fmt.Printf("buildActionID sys [%s] =[%q]\n", p.ImportPath, h.DebugInfo())
-	//	}
-
 	return h.Sum()
 }
 
@@ -1435,9 +1430,6 @@ func (b *Builder) runOut(dir string, desc string, env []string, cmdargs ...inter
 
 	var buf bytes.Buffer
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
-	//	if strings.HasSuffix(cmdline[0], "link.exe") {
-	//		fmt.Printf("cmdline:%@#v\n", cmdline)
-	//	}
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	cmd.Dir = dir

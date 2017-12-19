@@ -286,8 +286,6 @@ func (b *Builder) useCache(a *Action, p *load.Package, actionHash cache.ActionID
 			a.Target = "DO NOT USE - " + a.Mode
 			return true
 		}
-
-		//fmt.Printf("useCache id mismatch %s actionID=%s readactionID=%s target=%s\n", p.ImportPath, actionID, buildID, target)
 	}
 
 	// Special case for building a main package: if the only thing we
@@ -348,7 +346,6 @@ func (b *Builder) useCache(a *Action, p *load.Package, actionHash cache.ActionID
 					if p1.Stale && p1.StaleReason != "" {
 						if strings.HasPrefix(p1.StaleReason, "stale dependency: ") {
 							p.StaleReason = p1.StaleReason
-							//fmt.Printf("ComputeStaleOnly0 p=%@#v\np1=%@#v\n", p, p1)
 							break
 						}
 						if strings.HasPrefix(p.StaleReason, "build ID mismatch") {
@@ -358,7 +355,6 @@ func (b *Builder) useCache(a *Action, p *load.Package, actionHash cache.ActionID
 				}
 			}
 		}
-		//fmt.Printf("ComputeStaleOnly %@#v\n", p)
 		return true
 	}
 

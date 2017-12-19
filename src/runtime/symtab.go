@@ -369,8 +369,6 @@ type moduledata struct {
 	end, gcdata, gcbss    uintptr
 	types, etypes         uintptr
 
-	//buildtimestamp int64 //build timestamp, format time.Time.Uinx
-
 	textsectmap []textsect
 	typelinks   []int32 // offsets from types
 	itablinks   []*itab

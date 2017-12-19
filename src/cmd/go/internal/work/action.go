@@ -30,7 +30,6 @@ import (
 // It does not hold per-package state, because we
 // build packages in parallel, and the builder is shared.
 type Builder struct {
-	DebugStale  bool
 	WorkDir     string               // the temporary work directory (ends in filepath.Separator)
 	actionCache map[cacheKey]*Action // a cache of already-constructed actions
 	mkdirCache  map[string]bool      // a cache of created directories
@@ -404,7 +403,6 @@ func (b *Builder) VetAction(mode, depMode BuildMode, p *load.Package) *Action {
 // and possibly installing the result (according to mode).
 // depMode is the action (build or install) to use when compiling dependencies.
 func (b *Builder) LinkAction(mode, depMode BuildMode, p *load.Package) *Action {
-	//fmt.Printf("LinkAction %v %v %@#v\n", mode, depMode, p)
 	// Construct link action.
 	a := b.cacheAction("link", p, func() *Action {
 		a := &Action{

@@ -805,7 +805,6 @@ func writeruntimebuildtimestamp(ctxt *Link) {
 	s.Attr |= sym.AttrReachable
 	s.Type = sym.SRODATA
 	s.AddUint64(ctxt.Arch, uint64(runtimebuildtimestamp))
-	//println("writeruntimebuildtimestamp:", runtimebuildtimestamp)
 }
 
 func addstrdata1(ctxt *Link, arg string) {
@@ -827,7 +826,6 @@ func addstrdata(ctxt *Link, name string, value string) {
 	if name == "runtime.buildtimestamp" {
 		if v, err := strconv.ParseInt(value, 0, 64); err == nil {
 			runtimebuildtimestamp = v //set buidtimestamp by command line
-			//println("set runtime.buildtimestamp:", v)
 		} else {
 			Exitf("-X %s=%s error:%s", name, value, err.Error())
 		}

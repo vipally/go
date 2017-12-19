@@ -8,7 +8,6 @@ package list
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -153,7 +152,6 @@ var listJson = CmdList.Flag.Bool("json", false, "")
 var nl = []byte{'\n'}
 
 func runList(cmd *base.Command, args []string) {
-	//fmt.Printf("runList listE=%v listFmt=%v, listJson=%v,\ncmd=%@#v\n args=%@#v\n",*listE, *listFmt, *listJson, cmd, args)
 	work.BuildInit()
 	out := newTrackingWriter(os.Stdout)
 	defer out.w.Flush()
@@ -215,8 +213,6 @@ func runList(cmd *base.Command, args []string) {
 		for _, p := range pkgs {
 			a.Deps = append(a.Deps, b.AutoAction(work.ModeInstall, work.ModeInstall, p))
 		}
-		b.DebugStale = true
-		fmt.Printf("needStale build %@#v", b)
 		b.Do(a)
 	}
 
