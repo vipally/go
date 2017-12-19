@@ -153,8 +153,7 @@ var listJson = CmdList.Flag.Bool("json", false, "")
 var nl = []byte{'\n'}
 
 func runList(cmd *base.Command, args []string) {
-	fmt.Printf("runList listE=%v listFmt=%v, listJson=%v,\ncmd=%@#v\n args=%@#v\n",
-		*listE, *listFmt, *listJson, cmd, args)
+	//fmt.Printf("runList listE=%v listFmt=%v, listJson=%v,\ncmd=%@#v\n args=%@#v\n",*listE, *listFmt, *listJson, cmd, args)
 	work.BuildInit()
 	out := newTrackingWriter(os.Stdout)
 	defer out.w.Flush()

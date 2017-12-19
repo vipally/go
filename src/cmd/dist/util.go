@@ -71,10 +71,10 @@ func run(dir string, mode int, cmd ...string) string {
 		errprintf("run: %s\n", strings.Join(cmd, " "))
 	}
 
-	println("dist run", dir, mode)
-	for _, v := range cmd {
-		println("    ", v)
-	}
+	//println("dist run", dir, mode)
+	//	for _, v := range cmd {
+	//		println("    ", v)
+	//	}
 
 	xcmd := exec.Command(cmd[0], cmd[1:]...)
 	xcmd.Dir = dir

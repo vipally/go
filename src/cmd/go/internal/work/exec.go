@@ -278,7 +278,10 @@ func (b *Builder) buildActionID(a *Action) cache.ActionID {
 		}
 	}
 
-	fmt.Printf("buildActionID [%s]=[%X]\n", a.Package.ImportPath, h.Sum())
+	//	fmt.Printf("buildActionID [%s]=[%X]\n", a.Package.ImportPath, h.Sum())
+	//	if p.ImportPath == "runtime/internal/sys" || strings.HasPrefix(p.ImportPath, "cmd/") {
+	//		fmt.Printf("buildActionID sys [%s] =[%q]\n", p.ImportPath, h.DebugInfo())
+	//	}
 
 	return h.Sum()
 }
