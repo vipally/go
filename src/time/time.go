@@ -1508,3 +1508,13 @@ func div(t Time, d Duration) (qmod2 int, r Duration) {
 	}
 	return
 }
+
+// Provided by package runtime. time_buildtimestamp
+func buildtimestamp() int64
+
+// BuidTime reports the time when this execuable was build.
+// Which is based on runtime.BuildTimestamp()
+func BuidTime() Time {
+	timestamp := buildtimestamp()
+	return Unix(timestamp, 0)
+}

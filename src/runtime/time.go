@@ -11,6 +11,30 @@ import (
 	"unsafe"
 )
 
+// timestamp of when the executable was build.
+// Which was write by linker.
+var buildtimestamp int64
+
+// BuildTimestamp returns the compile timestamp of the executable.
+// Which is write by linker, and format as time.Now.Unix.
+// Time.BuildTime is based on this timestamp.
+func BuildTimestamp() int64 {
+	return buildtimestamp
+}
+
+// UnixNow returns the seconds of unix time, which is the same as time.Now().Unix()
+func UnixNow() int64 {
+	sec, nsec, _ := time_now()
+	unixNow := (sec*1e9 + int64(nsec)) / 1e9
+	return unixNow
+}
+
+//time.buildtimestamp() which is the same as runtime.BuildTimestamp()
+//go:linkname time_buildtimestamp time.buildtimestamp
+func time_buildtimestamp() int64 {
+	return BuildTimestamp()
+}
+
 // Package time knows the layout of this structure.
 // If this struct changes, adjust ../time/sleep.go:/runtimeTimer.
 // For GOOS=nacl, package syscall knows the layout of this structure.
