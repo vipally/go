@@ -11,22 +11,29 @@ import (
 	"unsafe"
 )
 
-// timestamp of when the executable was build.
-// Which was write by linker.
+// timestamp to report when the application was build.
+// Which will be written by linker.
 var buildtimestamp int64
 
-// BuildTimestamp returns the compile timestamp of the executable.
-// Which is write by linker, and format as time.Now.Unix.
-// Time.BuildTime is based on this timestamp.
+// BuildTimestamp returns the compile timestamp of the application.
+// Which is written by linker, and format as time.Now.Unix.
+// Time.BuildTime is based on BuildTimestamp.
 func BuildTimestamp() int64 {
 	return buildtimestamp
 }
 
-// UnixNow returns the seconds of unix time, which is the same as time.Now().Unix()
+// UnixNow returns the seconds of unix time, 
+// which is the same as time.Now().Unix()
 func UnixNow() int64 {
 	sec, nsec, _ := time_now()
 	unixNow := (sec*1e9 + int64(nsec)) / 1e9
 	return unixNow
+}
+
+// UnixNowNano returns accurate of unix time.
+// Which is the same as time.now
+func UnixNowNano()(sec int64, nsec int32, mono int64) {
+	return time_now() (sec int64, nsec int32, mono int64)
 }
 
 //time.buildtimestamp() which is the same as runtime.BuildTimestamp()
