@@ -1514,7 +1514,7 @@ func buildtimestamp() int64
 
 // BuidTime reports the time when this execuable was build.
 // Which is based on runtime.BuildTimestamp()
-func BuidTime() Time {
+func BuildTime() Time {
 	timestamp := buildtimestamp()
 	return Unix(timestamp, 0)
 }

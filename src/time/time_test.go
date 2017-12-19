@@ -1333,7 +1333,7 @@ func TestReadFileLimit(t *testing.T) {
 func TestBuildTime(t *testing.T) {
 	now := Now()
 	unixNow := runtime.UnixNow()
-	buildTime := BuidTime()
+	buildTime := BuildTime()
 	buildTimestamp := runtime.BuildTimestamp()
 	dur := now.Sub(buildTime)
 
