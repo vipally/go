@@ -10,9 +10,6 @@ import (
 	"unsafe"
 )
 
-//type of goroutin priority
-type priorityType = int32
-
 // defined constants
 const (
 	// G status
@@ -391,7 +388,7 @@ type g struct {
 	timer          *timer         // cached timer for time.Sleep
 	selectDone     uint32         // are we participating in a select and did someone win the race?
 
-	priority priorityType //Ally:priority of g in sched.waitlist
+	//priority priorityType //Ally:priority of g in sched.waitlist
 
 	// Per-G GC state
 

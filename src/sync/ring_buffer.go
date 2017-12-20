@@ -4,13 +4,6 @@ import (
 	"sync/atomic"
 )
 
-const (
-	priorityMask = 1<<32 - 1
-	priorityMin  = 0
-	priorityMax  = priorityMask
-	priorityAny  = -1
-)
-
 func NewRingBuffer(size int) *RingBuffer {
 	p := &RingBuffer{}
 	p.Init(size)
@@ -54,7 +47,7 @@ func (rb *RingBuffer) ReserveW() (id uint64) {
 		}
 
 		//buffer full, wait as writer in order to awake by another reader
-		rb.wlWriter.Wait(priorityAny)
+		rb.wlWriter.Wait(PriorityFirst)
 	}
 	return
 }
@@ -83,7 +76,7 @@ func (rb *RingBuffer) ReserveR() (id uint64) {
 		}
 
 		//buffer empty, wait as reader in order to wakeup by another writer
-		rb.wlReader.Wait(priorityAny)
+		rb.wlReader.Wait(PriorityFirst)
 	}
 	return
 }
