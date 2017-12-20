@@ -64,7 +64,8 @@ const (
 	traceEvGoBlockGC         = 42 // goroutine blocks on GC assist [timestamp, stack]
 	traceEvGCMarkAssistStart = 43 // GC mark assist start [timestamp, stack]
 	traceEvGCMarkAssistDone  = 44 // GC mark assist done [timestamp]
-	traceEvCount             = 45
+	traceEvGoBlockWaitList   = 45 // goroutine blocks on WaitList [timestamp, stack]
+	traceEvCount             = 46
 )
 
 const (

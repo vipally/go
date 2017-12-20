@@ -4,6 +4,7 @@
 package runtime
 
 import (
+	"runtime/internal/atomic"
 	"unsafe"
 )
 
@@ -51,61 +52,158 @@ const (
 
 // add g to waitSem list sort by priority ascend.
 // if waitSem is nil, g will be added to global sched list
-//go:linkname sync_goWaitWithPriority sync.goWaitWithPriority
-func sync_goWaitWithPriority(waitSem *uint32, priority priorityType) {
-	if waitSem != nil {
-		s := acquireSudog()
-		root := semroot(waitSem)
-		lock(&root.lock)
-		root.queueWithPriority(waitSem, s, priority)
-		unlock(&root.lock)
-		//goparkunlock(&root.lock, "semacquire", traceEvGoBlockSync, 4)
-	} else {
+//go:linkname sync_runtime_goWaitWithPriority sync.runtime_goWaitWithPriority
+func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType) {
+	if waitSem == nil {
 		panic("nil waitSem")
-		//gp := getg()
-		//		status := readgstatus(gp)
-		//		if status&^_Gscan != _Grunning {
-		//			dumpgstatus(gp)
-		//			throw("bad g status")
-		//		}
-		//		casgstatus(gp, _Grunning, _Grunnable)
-		//		dropg()
-		//		lock(&sched.lock)
-		//		globrunqput(gp)
-		//		unlock(&sched.lock)
 	}
-	schedule()
+
+	gp := getg()
+	if gp != gp.m.curg {
+		throw("goWaitWithPriority not on the G stack")
+	}
+
+	s := acquireSudog()
+	s.releasetime = 0
+	s.acquiretime = 0
+	s.ticket = 0
+	root := semroot(waitSem)
+	lock(&root.lock)
+	// Add ourselves to nwait to disable "easy case" in semrelease.
+	atomic.Xadd(&root.nwait, 1)
+	root.queuePriority(waitSem, s, priority)
+	goparkunlock(&root.lock, "sync_runtime_goWaitWithPriority", traceEvGoBlockWaitList, 4)
+	//unlock(&root.lock)
+	//schedule()
+	releaseSudog(s)
 }
 
 // wake up gs which hold pri <= priority from head of awakeSem.
 // Current g will continue.
-//go:linkname sync_goAwakeWithPriority sync.goAwakeWithPriority
-func sync_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
-	if awakeSem != nil {
-		root := semroot(awakeSem)
-		lock(&root.lock)
-		s, _ := root.dequeue(awakeSem)
-		unlock(&root.lock)
-		if s != nil {
-			readyWithTime(s, 5)
-		} else {
-			schedule()
-		}
-	} else {
+//go:linkname sync_runtime_goAwakeWithPriority sync.runtime_goAwakeWithPriority
+func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
+	if awakeSem == nil {
 		panic("nil awakeSem")
-		//schedule()
 	}
+
+	gp := getg()
+	if gp != gp.m.curg {
+		throw("goAwakeWithPriority not on the G stack")
+	}
+
+	root := semroot(awakeSem)
+	lock(&root.lock)
+	if num := root.dequeuePriority(awakeSem, priority); num > 0 {
+		atomic.Xadd(&root.nwait, -num)
+	}
+	unlock(&root.lock)
 }
 
-func (root *semaRoot) dequeueWithPriority(addr *uint32, priority priorityType) (n int) {
-	return 0
+func (root *semaRoot) dequeuePriority(addr *uint32, priority priorityType) (num int32) {
+	if false { //debug refer
+		root.queue(addr, nil, false)
+		root.dequeue(addr)
+		sync_runtime_SemacquireMutex(addr, false)
+		sync_runtime_Semrelease(addr, false)
+		schedule()
+	}
+
+	ps := &root.treap
+	s := *ps
+	for ; s != nil; s = *ps {
+		if s.elem == unsafe.Pointer(addr) {
+			goto Found
+		}
+		if uintptr(unsafe.Pointer(addr)) < uintptr(s.elem) {
+			ps = &s.prev
+		} else {
+			ps = &s.next
+		}
+	}
+	return 0 //do not found
+
+Found:
+	saveHead := *s
+	now := int64(0)
+	if s.acquiretime != 0 {
+		now = cputicks()
+	}
+	p := s
+	n := s.waitlink
+	for ; p != nil && p.priority <= priority; p = n {
+		n = p.waitlink
+		num++
+		casgstatus(p.g, _Gwaiting, _Grunnable)
+		globrunqput(p.g)
+		p.priority = 0
+		p.parent = nil
+		p.elem = nil
+		p.next = nil
+		p.prev = nil
+		p.ticket = 0
+		p.waitlink = nil
+		p.waittail = nil
+	}
+
+	if p != s {
+		if t, h := p, &saveHead; t != nil {
+			// Substitute t, also waiting on addr, for s in root tree of unique addrs.
+			*ps = t
+			t.ticket = h.ticket
+			t.parent = h.parent
+			t.prev = h.prev
+			if t.prev != nil {
+				t.prev.parent = t
+			}
+			t.next = h.next
+			if t.next != nil {
+				t.next.parent = t
+			}
+			if t.waitlink != nil {
+				t.waittail = h.waittail
+			} else {
+				t.waittail = nil
+			}
+			t.acquiretime = now
+		} else {
+			// Rotate s down to be leaf of tree for removal, respecting priorities.
+			for s.next != nil || s.prev != nil {
+				if s.next == nil || s.prev != nil && s.prev.ticket < s.next.ticket {
+					root.rotateRight(s)
+				} else {
+					root.rotateLeft(s)
+				}
+			}
+			// Remove s, now a leaf.
+			if s.parent != nil {
+				if s.parent.prev == s {
+					s.parent.prev = nil
+				} else {
+					s.parent.next = nil
+				}
+			} else {
+				root.treap = nil
+			}
+		}
+		s.parent = nil
+		s.elem = nil
+		s.next = nil
+		s.prev = nil
+		s.ticket = 0
+		s.priority = 0
+	}
+
+	return
 }
 
 // queue adds s to the blocked goroutines in semaRoot with priority.
-func (root *semaRoot) queueWithPriority(addr *uint32, s *sudog, priority priorityType) {
+// refer semaRoot.queue
+func (root *semaRoot) queuePriority(addr *uint32, s *sudog, priority priorityType) {
 	if false { //debug refer
 		root.queue(addr, s, false)
 		root.dequeue(addr)
+		sync_runtime_SemacquireMutex(addr, false)
+		sync_runtime_Semrelease(addr, false)
 	}
 
 	s.g = getg()
@@ -119,7 +217,7 @@ func (root *semaRoot) queueWithPriority(addr *uint32, s *sudog, priority priorit
 	for t := *pt; t != nil; t = *pt {
 		if t.elem == unsafe.Pointer(addr) {
 			// Already have addr in list.
-			if priority == priorityFirst || priority < t.priority {
+			if priority == priorityFirst || priority <= t.priority {
 				// Substitute s in t's place in treap.
 				*pt = s
 				s.ticket = t.ticket
@@ -154,9 +252,10 @@ func (root *semaRoot) queueWithPriority(addr *uint32, s *sudog, priority priorit
 				s.waitlink = nil
 			} else { // add s to wait list order by priority ascend
 				p := *pt
-				for ; p.waitlink != nil && priority < p.waitlink.priority; p = p.waitlink { //find the suitable node to insert after
-					//do nothing
+				for p.waitlink != nil && priority > p.waitlink.priority { //find the suitable node to insert after
+					p = p.waitlink
 				}
+				//insert s after p
 				n := p.waitlink
 				p.waitlink = s
 				s.parent = nil
