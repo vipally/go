@@ -72,9 +72,9 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType) {
 	// Add ourselves to nwait to disable "easy case" in semrelease.
 	atomic.Xadd(&root.nwait, 1)
 	root.queuePriority(waitSem, s, priority)
-	goparkunlock(&root.lock, "sync_runtime_goWaitWithPriority", traceEvGoBlockWaitList, 4)
-	//unlock(&root.lock)
-	//schedule()
+	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
+	unlock(&root.lock)
+	//goparkunlock(&root.lock, "sync_runtime_goWaitWithPriority", traceEvGoBlockWaitList, 4)
 	releaseSudog(s)
 }
 
