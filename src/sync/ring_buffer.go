@@ -18,6 +18,7 @@ func NewRingBuffer(size int) *RingBuffer {
 }
 
 //goroutine-safe cycle buffer
+//http://mechanitis.blogspot.com/2011/06/dissecting-disruptor-whats-so-special.html
 type RingBuffer struct {
 	size     int      //buffer size, readonly
 	wlReader WaitList //waitlist that are wating read
