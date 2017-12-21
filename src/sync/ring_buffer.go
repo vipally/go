@@ -1,7 +1,12 @@
 package sync
 
 import (
+	"runtime"
 	"sync/atomic"
+)
+
+const (
+	isDebug = true
 )
 
 func NewRingBuffer(size int) *RingBuffer {
@@ -37,11 +42,14 @@ func (cc *checkConflict) init(addr *uint64, val uint64) *checkConflict {
 }
 
 //do not use pointer receiver to escape to heap
-func (cc checkConflict) check() bool {
-	if atomic.LoadUint64(cc.addr) >= cc.val {
-		return true
+func (cc checkConflict) needblock() bool {
+	ld := atomic.LoadUint64(cc.addr)
+	block := ld < cc.val
+	//println("needblock", cc.addr, ld, cc.val, block)
+	if !block {
+		panic("do not need lock")
 	}
-	return false
+	return block
 }
 
 // Init ringbuffer with size
@@ -66,6 +74,9 @@ func (rb *RingBuffer) BufferIndex(id uint64) int {
 // It will wait if ringbuffer is full.
 func (rb *RingBuffer) ReserveW() (id uint64) {
 	id = atomic.AddUint64(&rb.wReserve, 1) - 1
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "ReserveW", rb.rCommit)
+	}
 	var cc checkConflict
 	for {
 		dataStart := atomic.LoadUint64(&rb.rCommit)
@@ -75,7 +86,17 @@ func (rb *RingBuffer) ReserveW() (id uint64) {
 		}
 
 		//buffer full, wait as writer in order to awake by another reader
-		rb.wlWriter.Wait(PriorityFirst, cc.init(&rb.rCommit, dataStart+1).check)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "ReserveW wait rCommit", &rb.wlWriter.sema, rb.rCommit, id-uint64(rb.size)+1, dataStart, maxW)
+		}
+		rb.wlWriter.Wait(PriorityFirst, cc.init(&rb.rCommit, id-uint64(rb.size)+1).needblock)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "ReserveW wait end", rb.rCommit, id-uint64(rb.size)+1, dataStart, maxW)
+		}
+	}
+
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "ReserveW", "ok")
 	}
 	return
 }
@@ -87,14 +108,29 @@ func (rb *RingBuffer) CommitW(id uint64) {
 	newId := id + 1
 	priority := rb.priority(id)
 	var cc checkConflict
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "CommitW", rb.wCommit)
+	}
 	for {
 		if atomic.CompareAndSwapUint64(&rb.wCommit, id, newId) { //commit OK
+			if isDebug {
+				println("go", runtime.GetGoroutineId(), id, "CommitW wakeup", priority+1)
+			}
 			rb.wlReader.Wakeup(priority + 1) //wakeup reader
 			break
 		}
 
 		//commit fail, wait as reader in order to wakeup by another writer
-		rb.wlReader.Wait(priority, cc.init(&rb.wCommit, id).check)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "CommitW wait wCommit", &rb.wlReader.sema, rb.wCommit, id)
+		}
+		rb.wlReader.Wait(priority, cc.init(&rb.wCommit, id).needblock)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "CommitW wait end", rb.wCommit, id)
+		}
+	}
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "CommitW", rb.wCommit, "ok")
 	}
 }
 
@@ -102,6 +138,9 @@ func (rb *RingBuffer) CommitW(id uint64) {
 // It will wait if ringbuffer is empty.
 func (rb *RingBuffer) ReserveR() (id uint64) {
 	id = atomic.AddUint64(&rb.rReserve, 1) - 1
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "ReserveR", rb.wCommit)
+	}
 	var cc checkConflict
 	for {
 		w := atomic.LoadUint64(&rb.wCommit)
@@ -110,7 +149,16 @@ func (rb *RingBuffer) ReserveR() (id uint64) {
 		}
 
 		//buffer empty, wait as reader in order to wakeup by another writer
-		rb.wlReader.Wait(PriorityFirst, cc.init(&rb.wCommit, id-1).check)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "ReserveR wait wCommit", &rb.wlReader.sema, rb.wCommit, id+1)
+		}
+		rb.wlReader.Wait(PriorityFirst, cc.init(&rb.wCommit, id+1).needblock)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "ReserveR wait end", rb.wCommit, id+1)
+		}
+	}
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "ReserveR", "ok")
 	}
 	return
 }
@@ -122,14 +170,29 @@ func (rb *RingBuffer) CommitR(id uint64) {
 	newId := id + 1
 	priority := rb.priority(id)
 	var cc checkConflict
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "CommitR", rb.rCommit)
+	}
 	for {
 		if atomic.CompareAndSwapUint64(&rb.rCommit, id, newId) {
+			if isDebug {
+				println("go", runtime.GetGoroutineId(), id, "CommitR wakeup", priority+1)
+			}
 			rb.wlWriter.Wakeup(priority + 1) //wakeup writer
 			break
 		}
 
 		//commit fail, wait as writer in order to wakeup by another reader
-		rb.wlWriter.Wait(priority, cc.init(&rb.rCommit, id).check)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "CommitR wait rCommit", &rb.wlWriter.sema, rb.rCommit, id)
+		}
+		rb.wlWriter.Wait(priority, cc.init(&rb.rCommit, id).needblock)
+		if isDebug {
+			println("go", runtime.GetGoroutineId(), id, "CommitR wait end", rb.rCommit, id)
+		}
+	}
+	if isDebug {
+		println("go", runtime.GetGoroutineId(), id, "CommitR", rb.rCommit, "ok")
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 
 const (
 	dataCnt = 100
-	buffLen = 10
+	buffLen = 4
 	rCnt    = 2
 	wCnt    = 2
 )
@@ -20,13 +20,13 @@ var (
 	ringBuffer = NewRingBuffer(buffLen)
 	wg         WaitGroup
 	lock       RWMutex
-	isDebug    = true
+	isDebug    = false
 )
 
 func init() {
 	cpuN := runtime.NumCPU()
 	fmt.Println("GOMAXPROCS", cpuN)
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(1)
 }
 
 func TestCycleBuffer(t *testing.T) {

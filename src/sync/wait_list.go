@@ -9,7 +9,7 @@ const (
 )
 
 //Provided by runtime.
-func runtime_goWaitWithPriority(waitSem *uint32, priority PriorityType, check func() bool)
+func runtime_goWaitWithPriority(waitSem *uint32, priority PriorityType, needblock func() bool)
 func runtime_goAwakeWithPriority(awakeSem *uint32, priority PriorityType)
 
 // WaitList block a list of goroutins which are waiting the same event.
@@ -21,8 +21,8 @@ type WaitList struct {
 
 // Wait push current goroutin in wait list order by priority.
 // Which will stop current g and runs gschedule.
-func (wl *WaitList) Wait(priority PriorityType, check func() bool) {
-	runtime_goWaitWithPriority(&wl.sema, priority, check)
+func (wl *WaitList) Wait(priority PriorityType, needblock func() bool) {
+	runtime_goWaitWithPriority(&wl.sema, priority, needblock)
 }
 
 // Wakeup wakes up gotoutins that holds pri <= priority.

@@ -77,7 +77,7 @@ func (bc blockCheck) checkunlock(g_ *g, lock unsafe.Pointer) bool {
 // add g to waitSem list sort by priority ascend.
 // if waitSem is nil, g will be added to global sched list
 //go:linkname sync_runtime_goWaitWithPriority sync.runtime_goWaitWithPriority
-func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, check func() bool) {
+func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, needblock func() bool) {
 	if waitSem == nil {
 		panic("nil waitSem")
 	}
@@ -87,18 +87,25 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, che
 		throw("goWaitWithPriority not on the G stack")
 	}
 
+	root := semroot(waitSem)
+	lock(&root.lock)
+
+	if !needblock() { //block condition miss, do not block
+		unlock(&root.lock)
+		return
+	}
+
 	s := acquireSudog()
 	s.releasetime = 0
 	s.acquiretime = 0
 	s.ticket = 0
-	root := semroot(waitSem)
-	lock(&root.lock)
 	// Add ourselves to nwait to disable "easy case" in semrelease.
 	atomic.Xadd(&root.nwait, 1)
 	root.queuePriority(waitSem, s, priority)
+	root.debugShowList(waitSem)
 
 	var bc blockCheck
-	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, bc.init(waitSem, s, check).checkunlock)
+	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, bc.init(waitSem, s, needblock).checkunlock)
 
 	releaseSudog(s)
 }
@@ -137,10 +144,35 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 
 	// Harder case: search for a waiter and wake it.
 	lock(&root.lock)
-	if num := root.dequeuePriority(awakeSem, priority); num > 0 {
+	root.debugShowList(awakeSem)
+	num := root.dequeuePriority(awakeSem, priority)
+	if num > 0 {
 		atomic.Xadd(&root.nwait, -num)
 	}
+	println("=========wakeup", awakeSem, priority, num)
 	unlock(&root.lock)
+}
+
+func (root *semaRoot) debugShowList(sem *uint32) {
+	println("debugShowList", sem)
+	ps := &root.treap
+	s := *ps
+	for ; s != nil; s = *ps {
+		if s.elem == unsafe.Pointer(sem) {
+			goto Found
+		}
+		if uintptr(unsafe.Pointer(sem)) < uintptr(s.elem) {
+			ps = &s.prev
+		} else {
+			ps = &s.next
+		}
+	}
+	return //do not found
+
+Found:
+	for p := s; p != nil; p = p.waitlink {
+		println("    ", p.g.goid, p.priority)
+	}
 }
 
 func (root *semaRoot) dequeuesudog(sem *uint32, su *sudog) {
@@ -208,6 +240,7 @@ Found:
 		num++
 		casgstatus(p.g, _Gwaiting, _Grunnable)
 		globrunqputhead(p.g)
+		println("====wakeup", addr, priority, p.g.goid, p.priority)
 		p.priority = 0
 		p.parent = nil
 		p.elem = nil
