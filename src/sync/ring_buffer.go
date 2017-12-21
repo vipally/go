@@ -36,7 +36,8 @@ func (cc *checkConflict) init(addr *uint64, val uint64) *checkConflict {
 	return cc
 }
 
-func (cc *checkConflict) check() bool {
+//do not use pointer receiver to escape to heap
+func (cc checkConflict) check() bool {
 	if atomic.LoadUint64(cc.addr) >= cc.val {
 		return true
 	}
@@ -74,8 +75,7 @@ func (rb *RingBuffer) ReserveW() (id uint64) {
 		}
 
 		//buffer full, wait as writer in order to awake by another reader
-		cc.init(&rb.rCommit, dataStart+1)
-		rb.wlWriter.Wait(PriorityFirst, cc.check)
+		rb.wlWriter.Wait(PriorityFirst, cc.init(&rb.rCommit, dataStart+1).check)
 	}
 	return
 }
@@ -89,13 +89,12 @@ func (rb *RingBuffer) CommitW(id uint64) {
 	var cc checkConflict
 	for {
 		if atomic.CompareAndSwapUint64(&rb.wCommit, id, newId) { //commit OK
-			rb.wlReader.Wakeup(priority) //wakeup reader
+			rb.wlReader.Wakeup(priority + 1) //wakeup reader
 			break
 		}
 
 		//commit fail, wait as reader in order to wakeup by another writer
-		cc.init(&rb.wCommit, id)
-		rb.wlReader.Wait(priority, cc.check)
+		rb.wlReader.Wait(priority, cc.init(&rb.wCommit, id).check)
 	}
 }
 
@@ -111,8 +110,7 @@ func (rb *RingBuffer) ReserveR() (id uint64) {
 		}
 
 		//buffer empty, wait as reader in order to wakeup by another writer
-		cc.init(&rb.wCommit, id-1)
-		rb.wlReader.Wait(PriorityFirst, cc.check)
+		rb.wlReader.Wait(PriorityFirst, cc.init(&rb.wCommit, id-1).check)
 	}
 	return
 }
@@ -126,13 +124,12 @@ func (rb *RingBuffer) CommitR(id uint64) {
 	var cc checkConflict
 	for {
 		if atomic.CompareAndSwapUint64(&rb.rCommit, id, newId) {
-			rb.wlWriter.Wakeup(priority) //wakeup writer
+			rb.wlWriter.Wakeup(priority + 1) //wakeup writer
 			break
 		}
 
 		//commit fail, wait as writer in order to wakeup by another reader
-		cc.init(&rb.rCommit, id)
-		rb.wlWriter.Wait(priority, cc.check)
+		rb.wlWriter.Wait(priority, cc.init(&rb.rCommit, id).check)
 	}
 }
 

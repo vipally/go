@@ -50,10 +50,34 @@ const (
 //	}
 //}
 
+type blockCheck struct {
+	sem   *uint32
+	s     *sudog
+	check func() bool
+}
+
+func (bc *blockCheck) init(sem *uint32, s *sudog, check func() bool) *blockCheck {
+	bc.sem = sem
+	bc.s = s
+	bc.check = check
+	return bc
+}
+
+//do not use pointer receiver to escape to heap
+func (bc blockCheck) checkunlock(g_ *g, lock unsafe.Pointer) bool {
+	noblock := bc.check()
+	if noblock { //do not block, dequeue bc.s
+		root := semroot(bc.sem)
+		root.dequeuesudog(bc.sem, bc.s)
+	}
+	unlock((*mutex)(lock))
+	return !noblock
+}
+
 // add g to waitSem list sort by priority ascend.
 // if waitSem is nil, g will be added to global sched list
 //go:linkname sync_runtime_goWaitWithPriority sync.runtime_goWaitWithPriority
-func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, waitAddr *uint64, waitVal uint64) {
+func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, check func() bool) {
 	if waitSem == nil {
 		panic("nil waitSem")
 	}
@@ -72,26 +96,21 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, wai
 	// Add ourselves to nwait to disable "easy case" in semrelease.
 	atomic.Xadd(&root.nwait, 1)
 	root.queuePriority(waitSem, s, priority)
-	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, waitAddr, waitVal)
-	//unlock(&root.lock)
+
+	var bc blockCheck
+	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, bc.init(waitSem, s, check).checkunlock)
 
 	releaseSudog(s)
 }
 
-func goparkunlockWaitList(lock *mutex, reason string, traceEv byte, traceskip int, waitAddr *uint64, waitVal uint64) {
+func goparkunlockWaitList(lock *mutex, reason string, traceEv byte, traceskip int, checkunlock func(g_ *g, lock unsafe.Pointer) bool) {
 	if false { //debug refer
 		goparkunlock(lock, "syncWaitList", traceEvGoBlockWaitList, 4)
 	}
+	//gopark(checkunlock, unsafe.Pointer(lock), reason, traceEv, traceskip)
+	unlock(lock)
+	gopark(nil, nil, reason, traceEv, traceskip)
 
-	checkWait := func(g_ *g, lock unsafe.Pointer) bool {
-		ret := true
-		//		if atomic.Load64(waitAddr) >= waitVal { //wait event achive, do not park then
-		//			ret = false
-		//		}
-		unlock((*mutex)(lock))
-		return ret
-	}
-	gopark(checkWait, unsafe.Pointer(lock), reason, traceEv, traceskip)
 }
 
 // wake up gs which hold pri <= priority from head of awakeSem.
@@ -122,6 +141,35 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 		atomic.Xadd(&root.nwait, -num)
 	}
 	unlock(&root.lock)
+}
+
+func (root *semaRoot) dequeuesudog(sem *uint32, su *sudog) {
+	ps := &root.treap
+	s := *ps
+	for ; s != nil; s = *ps {
+		if s.elem == unsafe.Pointer(sem) {
+			goto Found
+		}
+		if uintptr(unsafe.Pointer(sem)) < uintptr(s.elem) {
+			ps = &s.prev
+		} else {
+			ps = &s.next
+		}
+	}
+
+	throw("do not found") //do not found
+
+Found:
+	p := s
+	for p.waitlink != nil && p.waitlink != su {
+		p = p.waitlink
+	}
+	if p.waitlink == nil {
+		throw("do not found")
+	}
+	del := p.waitlink
+	p.waitlink = del.waitlink
+	del.waitlink = nil
 }
 
 func (root *semaRoot) dequeuePriority(addr *uint32, priority priorityType) (num int32) {
