@@ -30,3 +30,18 @@ func (wl *WaitList) Wait(priority PriorityType) {
 func (wl *WaitList) Wakeup(priority PriorityType) {
 	runtime_goAwakeWithPriority(&wl.sema, priority)
 }
+
+// WaitFirst waits at first of list.
+func (wl *WaitList) WaitFirst() {
+	wl.Wait(PriorityFirst)
+}
+
+// WaitFirst waits at last of list.
+func (wl *WaitList) WaitLast() {
+	wl.Wait(PriorityLast)
+}
+
+// WakeupAll wake up all waiters in list.
+func (wl *WaitList) WakeupAll() {
+	wl.Wakeup(PriorityLast)
+}
