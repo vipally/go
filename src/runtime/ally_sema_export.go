@@ -72,8 +72,9 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType) {
 	// Add ourselves to nwait to disable "easy case" in semrelease.
 	atomic.Xadd(&root.nwait, 1)
 	root.queuePriority(waitSem, s, priority)
-	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
 	unlock(&root.lock)
+	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
+
 	//goparkunlock(&root.lock, "sync_runtime_goWaitWithPriority", traceEvGoBlockWaitList, 4)
 	releaseSudog(s)
 }
@@ -134,7 +135,7 @@ Found:
 		n = p.waitlink
 		num++
 		casgstatus(p.g, _Gwaiting, _Grunnable)
-		globrunqput(p.g)
+		globrunqputhead(p.g)
 		p.priority = 0
 		p.parent = nil
 		p.elem = nil
@@ -146,21 +147,21 @@ Found:
 	}
 
 	if p != s {
-		if t, h := p, &saveHead; t != nil {
+		if t := p; t != nil {
 			// Substitute t, also waiting on addr, for s in root tree of unique addrs.
 			*ps = t
-			t.ticket = h.ticket
-			t.parent = h.parent
-			t.prev = h.prev
+			t.ticket = saveHead.ticket
+			t.parent = saveHead.parent
+			t.prev = saveHead.prev
 			if t.prev != nil {
 				t.prev.parent = t
 			}
-			t.next = h.next
+			t.next = saveHead.next
 			if t.next != nil {
 				t.next.parent = t
 			}
 			if t.waitlink != nil {
-				t.waittail = h.waittail
+				t.waittail = saveHead.waittail
 			} else {
 				t.waittail = nil
 			}

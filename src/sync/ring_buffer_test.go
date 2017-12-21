@@ -26,7 +26,7 @@ var (
 func init() {
 	cpuN := runtime.NumCPU()
 	fmt.Println("GOMAXPROCS", cpuN)
-	runtime.GOMAXPROCS(1)
+	runtime.GOMAXPROCS(2)
 }
 
 func TestCycleBuffer(t *testing.T) {
