@@ -54,7 +54,7 @@ func (rb *RingBuffer) ReserveW() (id uint64) {
 		}
 
 		//buffer full, wait as writer in order to awake by another reader
-		rb.wlWriter.Wait(PriorityFirst)
+		rb.wlWriter.Wait(PriorityFirst, &rb.rCommit, dataStart+1)
 	}
 	return
 }
@@ -72,7 +72,7 @@ func (rb *RingBuffer) CommitW(id uint64) {
 		}
 
 		//commit fail, wait as reader in order to wakeup by another writer
-		rb.wlReader.Wait(priority)
+		rb.wlReader.Wait(priority, &rb.wCommit, id)
 	}
 }
 
@@ -87,7 +87,7 @@ func (rb *RingBuffer) ReserveR() (id uint64) {
 		}
 
 		//buffer empty, wait as reader in order to wakeup by another writer
-		rb.wlReader.Wait(PriorityFirst)
+		rb.wlReader.Wait(PriorityFirst, &rb.wCommit, id-1)
 	}
 	return
 }
@@ -105,7 +105,7 @@ func (rb *RingBuffer) CommitR(id uint64) {
 		}
 
 		//commit fail, wait as writer in order to wakeup by another reader
-		rb.wlWriter.Wait(priority)
+		rb.wlWriter.Wait(priority, &rb.rCommit, id)
 	}
 }
 

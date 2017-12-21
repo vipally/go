@@ -9,7 +9,7 @@ const (
 )
 
 //Provided by runtime.
-func runtime_goWaitWithPriority(waitSem *uint32, priority PriorityType)
+func runtime_goWaitWithPriority(waitSem *uint32, priority PriorityType, waitAddr *uint64, waitVal uint64)
 func runtime_goAwakeWithPriority(awakeSem *uint32, priority PriorityType)
 
 // WaitList block a list of goroutins which are waiting the same event.
@@ -21,8 +21,8 @@ type WaitList struct {
 
 // Wait push current goroutin in wait list order by priority.
 // Which will stop current g and runs gschedule.
-func (wl *WaitList) Wait(priority PriorityType) {
-	runtime_goWaitWithPriority(&wl.sema, priority)
+func (wl *WaitList) Wait(priority PriorityType, waitAddr *uint64, waitVal uint64) {
+	runtime_goWaitWithPriority(&wl.sema, priority, waitAddr, waitVal)
 }
 
 // Wakeup wakes up gotoutins that holds pri <= priority.
@@ -31,17 +31,17 @@ func (wl *WaitList) Wakeup(priority PriorityType) {
 	runtime_goAwakeWithPriority(&wl.sema, priority)
 }
 
-// WaitFirst waits at first of list.
-func (wl *WaitList) WaitFirst() {
-	wl.Wait(PriorityFirst)
-}
+//// WaitFirst waits at first of list.
+//func (wl *WaitList) WaitFirst() {
+//	wl.Wait(PriorityFirst)
+//}
 
-// WaitFirst waits at last of list.
-func (wl *WaitList) WaitLast() {
-	wl.Wait(PriorityLast)
-}
+//// WaitFirst waits at last of list.
+//func (wl *WaitList) WaitLast() {
+//	wl.Wait(PriorityLast)
+//}
 
-// WakeupAll wake up all waiters in list.
-func (wl *WaitList) WakeupAll() {
-	wl.Wakeup(PriorityLast)
-}
+//// WakeupAll wake up all waiters in list.
+//func (wl *WaitList) WakeupAll() {
+//	wl.Wakeup(PriorityLast)
+//}

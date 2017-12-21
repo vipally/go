@@ -53,7 +53,7 @@ const (
 // add g to waitSem list sort by priority ascend.
 // if waitSem is nil, g will be added to global sched list
 //go:linkname sync_runtime_goWaitWithPriority sync.runtime_goWaitWithPriority
-func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType) {
+func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, waitAddr *uint64, waitVal uint64) {
 	if waitSem == nil {
 		panic("nil waitSem")
 	}
@@ -72,11 +72,26 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType) {
 	// Add ourselves to nwait to disable "easy case" in semrelease.
 	atomic.Xadd(&root.nwait, 1)
 	root.queuePriority(waitSem, s, priority)
-	unlock(&root.lock)
-	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
+	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, waitAddr, waitVal)
+	//unlock(&root.lock)
 
-	//goparkunlock(&root.lock, "sync_runtime_goWaitWithPriority", traceEvGoBlockWaitList, 4)
 	releaseSudog(s)
+}
+
+func goparkunlockWaitList(lock *mutex, reason string, traceEv byte, traceskip int, waitAddr *uint64, waitVal uint64) {
+	if false { //debug refer
+		goparkunlock(lock, "syncWaitList", traceEvGoBlockWaitList, 4)
+	}
+
+	checkWait := func(g_ *g, lock unsafe.Pointer) bool {
+		ret := true
+		//		if atomic.Load64(waitAddr) >= waitVal { //wait event achive, do not park then
+		//			ret = false
+		//		}
+		unlock((*mutex)(lock))
+		return ret
+	}
+	gopark(checkWait, unsafe.Pointer(lock), reason, traceEv, traceskip)
 }
 
 // wake up gs which hold pri <= priority from head of awakeSem.
@@ -93,6 +108,15 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 	}
 
 	root := semroot(awakeSem)
+
+	// Easy case: no waiters?
+	// This check must happen after the xadd, to avoid a missed wakeup
+	// (see loop in semacquire).
+	if atomic.Load(&root.nwait) == 0 {
+		return
+	}
+
+	// Harder case: search for a waiter and wake it.
 	lock(&root.lock)
 	if num := root.dequeuePriority(awakeSem, priority); num > 0 {
 		atomic.Xadd(&root.nwait, -num)
