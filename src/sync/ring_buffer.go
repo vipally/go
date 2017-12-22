@@ -46,9 +46,9 @@ func (cc checkConflict) needblock() bool {
 	ld := atomic.LoadUint64(cc.addr)
 	block := ld < cc.val
 	//println("needblock", cc.addr, ld, cc.val, block)
-	if !block {
-		panic("do not need lock")
-	}
+	//	if !block {
+	//		panic("do not need lock")
+	//	}
 	return block
 }
 

@@ -289,17 +289,20 @@ Found:
 	for ; p != nil && p.priority <= priority; p = n {
 		n = p.waitlink
 		num++
-		casgstatus(p.g, _Gwaiting, _Grunnable)
-		globrunqputhead(p.g)
+
 		//println("====wakeup", addr, priority, p.g.goid, p.priority)
-		p.priority = 0
+
 		p.parent = nil
 		p.elem = nil
 		p.next = nil
 		p.prev = nil
 		p.ticket = 0
+		p.priority = 0
 		p.waitlink = nil
 		p.waittail = nil
+
+		casgstatus(p.g, _Gwaiting, _Grunnable)
+		globrunqputhead(p.g)
 	}
 
 	if p != s {

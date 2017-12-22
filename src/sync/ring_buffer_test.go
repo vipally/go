@@ -1,6 +1,7 @@
 package sync_test
 
 import (
+	"os"
 	"time"
 
 	"fmt"
@@ -10,8 +11,8 @@ import (
 )
 
 const (
-	dataCnt = 100
-	buffLen = 4
+	dataCnt = 10000
+	buffLen = 200
 	rCnt    = 2
 	wCnt    = 2
 )
@@ -26,7 +27,7 @@ var (
 func init() {
 	cpuN := runtime.NumCPU()
 	fmt.Println("GOMAXPROCS", cpuN)
-	runtime.GOMAXPROCS(1)
+	runtime.GOMAXPROCS(2)
 }
 
 func TestCycleBuffer(t *testing.T) {
@@ -149,11 +150,13 @@ func delay() {
 		m *= i
 	}
 	m = m
+	os.Getpid()
 }
 
 func readerThread(id int, dataN, workerN int, lock bool) {
-
-	println("create readerThread", id, " ", runtime.GetGoroutineId())
+	if isDebug {
+		println("create readerThread", id, " ", runtime.GetGoroutineId())
+	}
 	id = int(runtime.GetGoroutineId())
 
 	if dataN%workerN != 0 {
@@ -182,12 +185,15 @@ func readerThread(id int, dataN, workerN int, lock bool) {
 		}
 		//time.Sleep(time.Nanosecond)
 	}
-	println("readerThread end", id, " ", runtime.GetGoroutineId())
+	if isDebug {
+		println("readerThread end", id, " ", runtime.GetGoroutineId())
+	}
 }
 
 func writerThread(id int, dataN, workerN int, lock bool) {
-
-	println("create writerThread", id, " ", runtime.GetGoroutineId())
+	if isDebug {
+		println("create writerThread", id, " ", runtime.GetGoroutineId())
+	}
 	id = int(runtime.GetGoroutineId())
 
 	if dataN%workerN != 0 {
@@ -221,7 +227,9 @@ func writerThread(id int, dataN, workerN int, lock bool) {
 		}
 		//time.Sleep(time.Nanosecond)
 	}
-	println("writerThread end", id, " ", runtime.GetGoroutineId())
+	if isDebug {
+		println("writerThread end", id, " ", runtime.GetGoroutineId())
+	}
 }
 
 func readerThreadLock(id int, dataN, workerN int) {
@@ -229,6 +237,7 @@ func readerThreadLock(id int, dataN, workerN int) {
 	for i := 0; i < num; i++ {
 		lock.RLock()
 		//time.Sleep(time.Nanosecond)
+		delay()
 		lock.RUnlock()
 	}
 	wg.Done()
@@ -239,6 +248,7 @@ func writerThreadLock(id int, dataN, workerN int) {
 	for i := 0; i < num; i++ {
 		lock.Lock()
 		//time.Sleep(time.Nanosecond)
+		delay()
 		lock.Unlock()
 	}
 	wg.Done()
