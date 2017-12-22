@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	isDebug = true
+	isDebug = false
 )
 
 func NewRingBuffer(size int) *RingBuffer {

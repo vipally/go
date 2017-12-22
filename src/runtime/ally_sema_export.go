@@ -16,64 +16,6 @@ const (
 	priorityLast  priorityType = 1<<64 - 1
 )
 
-//// Semacquire waits until *s > 0 and then atomically decrements it.
-//// It is intended as a simple sleep primitive for use by the synchronization
-//// library and should not be used directly.
-//func Semacquire(addr *uint32) {
-//	sync_runtime_Semacquire(addr)
-//}
-
-//// SemacquireMutex is like Semacquire, but for profiling contended Mutexes.
-//// If lifo is true, queue waiter at the head of wait queue.
-//func SemacquireMutex(addr *uint32, lifo bool) {
-//	sync_runtime_SemacquireMutex(addr, lifo)
-//}
-
-//// Semrelease atomically increments *s and notifies a waiting goroutine
-//// if one is blocked in Semacquire.
-//// It is intended as a simple wakeup primitive for use by the synchronization
-//// library and should not be used directly.
-//// If handoff is true, pass count directly to the first waiter.
-//func Semrelease(addr *uint32, handoff bool) {
-//	sync_runtime_Semrelease(addr, handoff)
-//}
-
-//// add g to waitSem list sort by priority ascend, and wake up head of awakeSem
-//// if waitSem is nil, g will be added to global sched list
-//// if awakeSem is nil, it will call Gosched
-//func GoschedAndAwake(waitSem *uint32, priority uint32, awakeSem *uint32) {
-//	goschedBlockWithPriority(waitSem, priority)
-//	goschedWakeUp(awakeSem)
-//	if false {
-//		goschedImpl(getg())
-//		Gosched()
-//	}
-//}
-
-type blockCheck struct {
-	sem   *uint32
-	s     *sudog
-	check func() bool
-}
-
-func (bc *blockCheck) init(sem *uint32, s *sudog, check func() bool) *blockCheck {
-	bc.sem = sem
-	bc.s = s
-	bc.check = check
-	return bc
-}
-
-//do not use pointer receiver to escape to heap
-func (bc blockCheck) checkunlock(g_ *g, lock unsafe.Pointer) bool {
-	noblock := bc.check()
-	if noblock { //do not block, dequeue bc.s
-		root := semroot(bc.sem)
-		root.dequeuesudog(bc.sem, bc.s)
-	}
-	unlock((*mutex)(lock))
-	return !noblock
-}
-
 // add g to waitSem list sort by priority ascend.
 // if waitSem is nil, g will be added to global sched list
 //go:linkname sync_runtime_goWaitWithPriority sync.runtime_goWaitWithPriority
@@ -90,7 +32,7 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, nee
 	root := semroot(waitSem)
 	lock(&root.lock)
 
-	if !needblock() { //block condition miss, do not block
+	if needblock != nil && !needblock() { //block condition miss, do not block
 		unlock(&root.lock)
 		return
 	}
@@ -100,25 +42,19 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, nee
 	s.acquiretime = 0
 	s.ticket = 0
 	// Add ourselves to nwait to disable "easy case" in semrelease.
-	atomic.Xadd(&root.nwait, 1)
 	root.debugShowList(waitSem, "wait before queue")
+	atomic.Xadd(&root.nwait, 1)
+	//println("before Xadd", waitSem, *waitSem, 1)
+	atomic.Xadd(waitSem, 1)
+	//println("after Xadd", waitSem, *waitSem, 1)
 	root.queuePriority(waitSem, s, priority)
 	root.debugShowList(waitSem, "wait after queue")
 
-	var bc blockCheck
-	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, bc.init(waitSem, s, needblock).checkunlock)
+	unlock(&root.lock)
+	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
+	//goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4)
 
 	releaseSudog(s)
-}
-
-func goparkunlockWaitList(lock *mutex, reason string, traceEv byte, traceskip int, checkunlock func(g_ *g, lock unsafe.Pointer) bool) {
-	if false { //debug refer
-		goparkunlock(lock, "syncWaitList", traceEvGoBlockWaitList, 4)
-	}
-	//gopark(checkunlock, unsafe.Pointer(lock), reason, traceEv, traceskip)
-	unlock(lock)
-	gopark(nil, nil, reason, traceEv, traceskip)
-
 }
 
 // wake up gs which hold pri <= priority from head of awakeSem.
@@ -147,161 +83,71 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 	lock(&root.lock)
 	root.debugShowList(awakeSem, "awake before dequeue")
 	num := root.dequeuePriority(awakeSem, priority)
-	root.debugShowList(awakeSem, "awake after dequeue")
 	if num > 0 {
 		atomic.Xadd(&root.nwait, -num)
+		//println("before Xadd dec", awakeSem, *awakeSem, -num)
+		atomic.Xadd(awakeSem, -num)
+		//println("after Xadd dec", awakeSem, *awakeSem, -num)
 	}
-	println("=========wakeup", awakeSem, priority, num)
+	root.debugShowList(awakeSem, "awake after dequeue")
+
+	//println("=========wakeup", awakeSem, priority, num)
 	unlock(&root.lock)
 }
 
 func (root *semaRoot) debugShowList(sem *uint32, title string) {
-	println("debugShowList", sem, title)
-	ps := &root.treap
-	s := *ps
-	for ; s != nil; s = *ps {
-		if s.elem == unsafe.Pointer(sem) {
-			goto Found
-		}
-		if uintptr(unsafe.Pointer(sem)) < uintptr(s.elem) {
-			ps = &s.prev
-		} else {
-			ps = &s.next
-		}
-	}
-	return //do not found
+	//	n := atomic.Load(sem)
+	//	println("debugShowList", n, sem, title, 0)
+	//	ps := &root.treap
+	//	s := *ps
+	//	for elem := uintptr(unsafe.Pointer(sem)); s != nil; s = *ps {
+	//		if s.elem == unsafe.Pointer(sem) {
+	//			goto Found
+	//		}
+	//		if elem < uintptr(s.elem) {
+	//			ps = &s.prev
+	//		} else {
+	//			ps = &s.next
+	//		}
+	//	}
 
-Found:
-	for p := s; p != nil; p = p.waitlink {
-		println("    ", p.g.goid, p.priority)
-	}
+	//	if n > 0 && title != "semroot" {
+	//		println("============waitlist len not match", sem, n, 0)
+	//		root.debugShowAddrs(root.treap, sem, title, 0)
+	//		throw("list len not match")
+	//	}
+	//	return //do not found
+
+	//Found:
+	//	cnt := uint32(0)
+	//	for p := s; p != nil; p = p.waitlink {
+	//		println("    ", p.g.goid, p.priority)
+	//		cnt++
+	//	}
+	//	if cnt != n && title != "semroot" {
+	//		println("============waitlist len not match", sem, n, cnt)
+	//		root.debugShowAddrs(root.treap, sem, title, 0)
+	//		throw("list len not match")
+	//	}
 }
 
-func (root *semaRoot) dequeuesudog(sem *uint32, su *sudog) {
-	ps := &root.treap
-	s := *ps
-	for ; s != nil; s = *ps {
-		if s.elem == unsafe.Pointer(sem) {
-			goto Found
-		}
-		if uintptr(unsafe.Pointer(sem)) < uintptr(s.elem) {
-			ps = &s.prev
-		} else {
-			ps = &s.next
-		}
-	}
+func (root *semaRoot) debugShowAddrs(s *sudog, sem *uint32, title string, depth int) {
+	//	if depth == 0 {
+	//		println("debugShowAddrs", s, sem, title)
+	//	}
 
-	throw("do not found") //do not found
-
-Found:
-	p := s
-	for p.waitlink != nil && p.waitlink != su {
-		p = p.waitlink
-	}
-	if p.waitlink == nil {
-		throw("do not found")
-	}
-	del := p.waitlink
-	p.waitlink = del.waitlink
-	del.waitlink = nil
-}
-
-func (root *semaRoot) dequeuePriority(addr *uint32, priority priorityType) (num int32) {
-	if false { //debug refer
-		root.queue(addr, nil, false)
-		root.dequeue(addr)
-		sync_runtime_SemacquireMutex(addr, false)
-		sync_runtime_Semrelease(addr, false)
-		schedule()
-	}
-
-	ps := &root.treap
-	s := *ps
-	for ; s != nil; s = *ps {
-		if s.elem == unsafe.Pointer(addr) {
-			goto Found
-		}
-		if uintptr(unsafe.Pointer(addr)) < uintptr(s.elem) {
-			ps = &s.prev
-		} else {
-			ps = &s.next
-		}
-	}
-	return 0 //do not found
-
-Found:
-	saveHead := *s
-	now := int64(0)
-	if s.acquiretime != 0 {
-		now = cputicks()
-	}
-	p := s
-	n := s.waitlink
-	for ; p != nil && p.priority <= priority; p = n {
-		n = p.waitlink
-		num++
-		casgstatus(p.g, _Gwaiting, _Grunnable)
-		globrunqputhead(p.g)
-		println("====wakeup", addr, priority, p.g.goid, p.priority)
-		p.priority = 0
-		p.parent = nil
-		p.elem = nil
-		p.next = nil
-		p.prev = nil
-		p.ticket = 0
-		p.waitlink = nil
-		p.waittail = nil
-	}
-
-	if p != s {
-		if t := p; t != nil {
-			// Substitute t, also waiting on addr, for s in root tree of unique addrs.
-			*ps = t
-			t.ticket = saveHead.ticket
-			t.parent = saveHead.parent
-			t.prev = saveHead.prev
-			if t.prev != nil {
-				t.prev.parent = t
-			}
-			t.next = saveHead.next
-			if t.next != nil {
-				t.next.parent = t
-			}
-			if t.waitlink != nil {
-				t.waittail = saveHead.waittail
-			} else {
-				t.waittail = nil
-			}
-			t.acquiretime = now
-		} else {
-			// Rotate s down to be leaf of tree for removal, respecting priorities.
-			for s.next != nil || s.prev != nil {
-				if s.next == nil || s.prev != nil && s.prev.ticket < s.next.ticket {
-					root.rotateRight(s)
-				} else {
-					root.rotateLeft(s)
-				}
-			}
-			// Remove s, now a leaf.
-			if s.parent != nil {
-				if s.parent.prev == s {
-					s.parent.prev = nil
-				} else {
-					s.parent.next = nil
-				}
-			} else {
-				root.treap = nil
-			}
-		}
-		s.parent = nil
-		s.elem = nil
-		s.next = nil
-		s.prev = nil
-		s.ticket = 0
-		s.priority = 0
-	}
-
-	return
+	//	if s != nil {
+	//		linehead := ""
+	//		for i := 0; i <= depth; i++ {
+	//			linehead += "  "
+	//		}
+	//		println(linehead, s.elem, s.ticket, s.priority, title)
+	//		if s.elem == unsafe.Pointer(sem) {
+	//			println(linehead, "====have find it", s.elem, s.ticket, s.priority, title)
+	//		}
+	//		root.debugShowAddrs(s.prev, sem, title, depth+1)
+	//		root.debugShowAddrs(s.next, sem, title, depth+1)
+	//	}
 }
 
 // queue adds s to the blocked goroutines in semaRoot with priority.
@@ -410,6 +256,105 @@ func (root *semaRoot) queuePriority(addr *uint32, s *sudog, priority priorityTyp
 	}
 }
 
+func (root *semaRoot) dequeuePriority(addr *uint32, priority priorityType) (num int32) {
+	if false { //debug refer
+		root.queue(addr, nil, false)
+		root.dequeue(addr)
+		sync_runtime_SemacquireMutex(addr, false)
+		sync_runtime_Semrelease(addr, false)
+		schedule()
+	}
+
+	ps := &root.treap
+	s := *ps
+	for ; s != nil; s = *ps {
+		if s.elem == unsafe.Pointer(addr) {
+			goto Found
+		}
+		if uintptr(unsafe.Pointer(addr)) < uintptr(s.elem) {
+			ps = &s.prev
+		} else {
+			ps = &s.next
+		}
+	}
+	return 0 //do not found
+
+Found:
+	saveHead := *s
+	now := int64(0)
+	if s.acquiretime != 0 {
+		now = cputicks()
+	}
+	p, n := s, s.waitlink
+	for ; p != nil && p.priority <= priority; p = n {
+		n = p.waitlink
+		num++
+		casgstatus(p.g, _Gwaiting, _Grunnable)
+		globrunqputhead(p.g)
+		//println("====wakeup", addr, priority, p.g.goid, p.priority)
+		p.priority = 0
+		p.parent = nil
+		p.elem = nil
+		p.next = nil
+		p.prev = nil
+		p.ticket = 0
+		p.waitlink = nil
+		p.waittail = nil
+	}
+
+	if p != s {
+		if t := p; t != nil {
+			// Substitute t, also waiting on addr, for s in root tree of unique addrs.
+			*ps = t
+			t.ticket = saveHead.ticket
+			t.parent = saveHead.parent
+			if t.prev = saveHead.prev; t.prev != nil {
+				t.prev.parent = t
+			}
+			if t.next = saveHead.next; t.next != nil {
+				t.next.parent = t
+			}
+			if t.waitlink != nil {
+				t.waittail = saveHead.waittail
+			} else {
+				t.waittail = nil
+			}
+			t.acquiretime = now
+		} else {
+			*s = saveHead //restore s temply
+			// Rotate s down to be leaf of tree for removal, respecting priorities.
+			for s.next != nil || s.prev != nil {
+				if s.next == nil || s.prev != nil && s.prev.ticket < s.next.ticket {
+					root.rotateRight(s)
+				} else {
+					root.rotateLeft(s)
+				}
+			}
+			// Remove s, now a leaf.
+			if s.parent != nil {
+				if s.parent.prev == s {
+					s.parent.prev = nil
+				} else {
+					s.parent.next = nil
+				}
+			} else {
+				//println("set treap nil", root, addr)
+				root.treap = nil
+			}
+		}
+		s.parent = nil
+		s.elem = nil
+		s.next = nil
+		s.prev = nil
+		s.ticket = 0
+		s.priority = 0
+		s.waitlink = nil
+		s.waittail = nil
+	}
+
+	return
+}
+
 func GetGoroutineId() int64 {
 	return getg().goid
 }
@@ -483,4 +428,100 @@ func GetGoroutineId() int64 {
 //	sched.waitqhead = 0
 //	sched.waitqtail = 0
 //	sched.waitqsize = 0
+//}
+
+//func (root *semaRoot) dequeuesudog(sem *uint32, su *sudog) {
+//	ps := &root.treap
+//	s := *ps
+//	for ; s != nil; s = *ps {
+//		if s.elem == unsafe.Pointer(sem) {
+//			goto Found
+//		}
+//		if uintptr(unsafe.Pointer(sem)) < uintptr(s.elem) {
+//			ps = &s.prev
+//		} else {
+//			ps = &s.next
+//		}
+//	}
+
+//	throw("do not found") //do not found
+
+//Found:
+//	p := s
+//	for p.waitlink != nil && p.waitlink != su {
+//		p = p.waitlink
+//	}
+//	if p.waitlink == nil {
+//		throw("do not found")
+//	}
+//	del := p.waitlink
+//	p.waitlink = del.waitlink
+//	del.waitlink = nil
+//}
+
+//// Semacquire waits until *s > 0 and then atomically decrements it.
+//// It is intended as a simple sleep primitive for use by the synchronization
+//// library and should not be used directly.
+//func Semacquire(addr *uint32) {
+//	sync_runtime_Semacquire(addr)
+//}
+
+//// SemacquireMutex is like Semacquire, but for profiling contended Mutexes.
+//// If lifo is true, queue waiter at the head of wait queue.
+//func SemacquireMutex(addr *uint32, lifo bool) {
+//	sync_runtime_SemacquireMutex(addr, lifo)
+//}
+
+//// Semrelease atomically increments *s and notifies a waiting goroutine
+//// if one is blocked in Semacquire.
+//// It is intended as a simple wakeup primitive for use by the synchronization
+//// library and should not be used directly.
+//// If handoff is true, pass count directly to the first waiter.
+//func Semrelease(addr *uint32, handoff bool) {
+//	sync_runtime_Semrelease(addr, handoff)
+//}
+
+//// add g to waitSem list sort by priority ascend, and wake up head of awakeSem
+//// if waitSem is nil, g will be added to global sched list
+//// if awakeSem is nil, it will call Gosched
+//func GoschedAndAwake(waitSem *uint32, priority uint32, awakeSem *uint32) {
+//	goschedBlockWithPriority(waitSem, priority)
+//	goschedWakeUp(awakeSem)
+//	if false {
+//		goschedImpl(getg())
+//		Gosched()
+//	}
+//}
+
+//type blockCheck struct {
+//	sem   *uint32
+//	s     *sudog
+//	check func() bool
+//}
+
+//func (bc *blockCheck) init(sem *uint32, s *sudog, check func() bool) *blockCheck {
+//	bc.sem = sem
+//	bc.s = s
+//	bc.check = check
+//	return bc
+//}
+
+////do not use pointer receiver to escape to heap
+//func (bc blockCheck) checkunlock(g_ *g, lock unsafe.Pointer) bool {
+//	noblock := bc.check()
+//	if noblock { //do not block, dequeue bc.s
+//		root := semroot(bc.sem)
+//		root.dequeuesudog(bc.sem, bc.s)
+//	}
+//	unlock((*mutex)(lock))
+//	return !noblock
+//}
+
+//func goparkunlockWaitList(lock *mutex, reason string, traceEv byte, traceskip int) {
+//	if false { //debug refer
+//		goparkunlock(lock, "syncWaitList", traceEvGoBlockWaitList, 4)
+//	}
+//	//gopark(checkunlock, unsafe.Pointer(lock), reason, traceEv, traceskip)
+//	unlock(lock)
+//	gopark(nil, nil, reason, traceEv, traceskip)
 //}

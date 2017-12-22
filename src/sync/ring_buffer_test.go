@@ -46,33 +46,33 @@ func TestCycleBufferLock(t *testing.T) {
 func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool) {
 	if sync {
 		ringBuffer.Init(buffLen)
-		_w := w
-		_r := r
-		for i := 0; i < r+w; {
-			if _w > 0 {
-				wg.Add(1)
-				go writerThread(i, dataN, w, lock)
-				_w--
-				i++
-			}
-			if _r > 0 {
-				wg.Add(1)
-				go readerThread(i+1, dataN, r, lock)
-				_r--
-				i++
-			}
-			//			if _w <= 0 && _r <= 0 {
-			//				break
-			//			}
+		//		_w := w
+		//		_r := r
+		//		for i := 0; i < r+w; {
+		//			if _w > 0 {
+		//				wg.Add(1)
+		//				go writerThread(i, dataN, w, lock)
+		//				_w--
+		//				i++
+		//			}
+		//			if _r > 0 {
+		//				wg.Add(1)
+		//				go readerThread(i+1, dataN, r, lock)
+		//				_r--
+		//				i++
+		//			}
+		//			if _w <= 0 && _r <= 0 {
+		//				break
+		//			}
+		//		}
+		for i := 0; i < r; i++ {
+			wg.Add(1)
+			go readerThread(i, dataN, r, lock)
 		}
-		//		for i := 0; i < r; i++ {
-		//			wg.Add(1)
-		//			go readerThread(i, dataN, r, lock)
-		//		}
-		//		for i := r; i < r+w; i++ {
-		//			wg.Add(1)
-		//			go writerThread(i, dataN, w, lock)
-		//		}
+		for i := r; i < r+w; i++ {
+			wg.Add(1)
+			go writerThread(i, dataN, w, lock)
+		}
 		wg.Wait()
 	} else {
 	}

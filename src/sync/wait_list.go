@@ -13,7 +13,7 @@ func runtime_goWaitWithPriority(waitSem *uint32, priority PriorityType, needbloc
 func runtime_goAwakeWithPriority(awakeSem *uint32, priority PriorityType)
 
 // WaitList block a list of goroutins which are waiting the same event.
-// Every waiter has a priority.And the wake up event will wake up sleeper by priority.
+// Every waiter has a priority. And the wake up event will wake up waiter by priority.
 type WaitList struct {
 	//state int32
 	sema uint32
