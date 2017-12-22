@@ -196,7 +196,9 @@ func semrelease1(addr *uint32, handoff bool) {
 }
 
 func semroot(addr *uint32) *semaRoot {
-	return &semtable[(uintptr(unsafe.Pointer(addr))>>3)%semTabSize].root
+	r := &semtable[(uintptr(unsafe.Pointer(addr))>>3)%semTabSize].root
+	r.debugShowList(addr, "semroot")
+	return r
 }
 
 func cansemacquire(addr *uint32) bool {
