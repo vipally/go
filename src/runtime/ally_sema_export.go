@@ -101,8 +101,9 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, nee
 	s.ticket = 0
 	// Add ourselves to nwait to disable "easy case" in semrelease.
 	atomic.Xadd(&root.nwait, 1)
+	root.debugShowList(waitSem, "wait before queue")
 	root.queuePriority(waitSem, s, priority)
-	root.debugShowList(waitSem)
+	root.debugShowList(waitSem, "wait after queue")
 
 	var bc blockCheck
 	goparkunlockWaitList(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4, bc.init(waitSem, s, needblock).checkunlock)
@@ -144,8 +145,9 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 
 	// Harder case: search for a waiter and wake it.
 	lock(&root.lock)
-	root.debugShowList(awakeSem)
+	root.debugShowList(awakeSem, "awake before dequeue")
 	num := root.dequeuePriority(awakeSem, priority)
+	root.debugShowList(awakeSem, "awake after dequeue")
 	if num > 0 {
 		atomic.Xadd(&root.nwait, -num)
 	}
@@ -153,8 +155,8 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 	unlock(&root.lock)
 }
 
-func (root *semaRoot) debugShowList(sem *uint32) {
-	println("debugShowList", sem)
+func (root *semaRoot) debugShowList(sem *uint32, title string) {
+	println("debugShowList", sem, title)
 	ps := &root.treap
 	s := *ps
 	for ; s != nil; s = *ps {
