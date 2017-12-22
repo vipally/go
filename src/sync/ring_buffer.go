@@ -54,6 +54,9 @@ func (cc checkConflict) needblock() bool {
 
 // Init ringbuffer with size
 func (rb *RingBuffer) Init(size int) {
+	if runtime.GOMAXPROCS(0) <= 1 {
+		panic("RingBuffer: use only when runtime.GOMAXPROCS > 1")
+	}
 	if size <= 0 {
 		panic("RingBuffer: invalid size")
 	}

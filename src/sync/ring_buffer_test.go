@@ -1,7 +1,6 @@
 package sync_test
 
 import (
-	"os"
 	"time"
 
 	"fmt"
@@ -11,10 +10,11 @@ import (
 )
 
 const (
-	dataCnt = 10000
-	buffLen = 200
+	dataCnt = 500
+	buffLen = 100
 	rCnt    = 2
 	wCnt    = 2
+	delayT  = 10000
 )
 
 var (
@@ -27,10 +27,10 @@ var (
 func init() {
 	cpuN := runtime.NumCPU()
 	fmt.Println("GOMAXPROCS", cpuN)
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(cpuN)
 }
 
-func TestCycleBuffer(t *testing.T) {
+func TestRingBuffer(t *testing.T) {
 	start := time.Now()
 	doTest(t, dataCnt, rCnt, wCnt, buffLen, true, false)
 	dur := time.Now().Sub(start)
@@ -144,13 +144,15 @@ func doBenchTest(b *testing.B, dataN, r, w int, _buffLen int, sync bool, lock bo
 }
 
 func delay() {
-	t := 1000000
+	t := delayT
 	m := 1
-	for i := 1; i < t; i++ {
-		m *= i
+	for i := 1; i <= t; i++ {
+		for j := 1; j <= t; j++ {
+			m *= j
+		}
 	}
 	m = m
-	os.Getpid()
+	//os.Getpid()
 }
 
 func readerThread(id int, dataN, workerN int, lock bool) {

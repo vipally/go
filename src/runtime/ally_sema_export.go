@@ -280,13 +280,12 @@ func (root *semaRoot) dequeuePriority(addr *uint32, priority priorityType) (num 
 	return 0 //do not found
 
 Found:
-	saveHead := *s
 	now := int64(0)
 	if s.acquiretime != 0 {
 		now = cputicks()
 	}
-	p, n := s, s.waitlink
-	for ; p != nil && p.priority <= priority; p = n {
+	p := s.waitlink
+	for n := p; p != nil && p.priority <= priority; p = n { //do not include s
 		n = p.waitlink
 		num++
 
@@ -302,29 +301,32 @@ Found:
 		p.waittail = nil
 
 		casgstatus(p.g, _Gwaiting, _Grunnable)
+		lock(&sched.lock)
 		globrunqputhead(p.g)
+		unlock(&sched.lock)
 	}
 
-	if p != s {
+	if s.priority <= priority { //dequeue s if possible
+		num++
 		if t := p; t != nil {
 			// Substitute t, also waiting on addr, for s in root tree of unique addrs.
 			*ps = t
-			t.ticket = saveHead.ticket
-			t.parent = saveHead.parent
-			if t.prev = saveHead.prev; t.prev != nil {
+			t.ticket = s.ticket
+			t.parent = s.parent
+			if t.prev = s.prev; t.prev != nil {
 				t.prev.parent = t
 			}
-			if t.next = saveHead.next; t.next != nil {
+			if t.next = s.next; t.next != nil {
 				t.next.parent = t
 			}
 			if t.waitlink != nil {
-				t.waittail = saveHead.waittail
+				t.waittail = s.waittail
 			} else {
 				t.waittail = nil
 			}
 			t.acquiretime = now
 		} else {
-			*s = saveHead //restore s temply
+			//*s = s //restore s temply
 			// Rotate s down to be leaf of tree for removal, respecting priorities.
 			for s.next != nil || s.prev != nil {
 				if s.next == nil || s.prev != nil && s.prev.ticket < s.next.ticket {
@@ -353,6 +355,11 @@ Found:
 		s.priority = 0
 		s.waitlink = nil
 		s.waittail = nil
+
+		casgstatus(s.g, _Gwaiting, _Grunnable)
+		lock(&sched.lock)
+		globrunqputhead(s.g)
+		unlock(&sched.lock)
 	}
 
 	return
