@@ -26,7 +26,6 @@ var (
 
 func init() {
 	cpuN := runtime.NumCPU()
-	//fmt.Println("GOMAXPROCS", cpuN)
 	runtime.GOMAXPROCS(cpuN)
 }
 
@@ -60,70 +59,6 @@ func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool
 		}
 		wg.Wait()
 	} else {
-	}
-}
-
-func Benchmark_100_50_10_10(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 50, true, false)
-}
-func Benchmark_100_20_10_10(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 20, true, false)
-}
-func Benchmark_100_5_10_10(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 5, true, false)
-}
-func Benchmark_100_20_2_2(b *testing.B) {
-	doBenchTest(b, 100, 2, 2, 20, true, false)
-}
-func Benchmark_100_20_5_5(b *testing.B) {
-	doBenchTest(b, 100, 5, 5, 20, true, false)
-}
-func Benchmark_10000_50_50_50(b *testing.B) {
-	doBenchTest(b, 10000, 50, 50, 50, true, false)
-}
-
-/////////////////////////////////////
-
-func Benchmark_100_50_10_10_lock(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 50, true, true)
-}
-func Benchmark_100_20_10_10_lock(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 20, true, true)
-}
-func Benchmark_100_5_10_10_lock(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 5, true, true)
-}
-func Benchmark_100_20_2_2_lock(b *testing.B) {
-	doBenchTest(b, 100, 2, 2, 20, true, true)
-}
-func Benchmark_100_20_5_5_lock(b *testing.B) {
-	doBenchTest(b, 100, 5, 5, 20, true, true)
-}
-func Benchmark_10000_50_50_50_lock(b *testing.B) {
-	doBenchTest(b, 10000, 50, 50, 50, true, true)
-}
-
-func doBenchTest(b *testing.B, dataN, r, w int, _buffLen int, sync bool, lock bool) {
-	for i := 0; i < b.N; i++ {
-		if sync {
-			ringBuffer.Init(_buffLen)
-			for i := 0; i < r; i++ {
-				wg.Add(1)
-				go readeWorker(i, dataN, r, lock)
-			}
-			for i := 0; i < w; i++ {
-				wg.Add(1)
-				go writeWorker(i, dataN, w, lock)
-			}
-			wg.Wait()
-		} else {
-			for i := 0; i < r; i++ {
-				readeWorker(i, dataN, r, lock)
-			}
-			for i := r; i < r+w; i++ {
-				writeWorker(i, dataN, w, lock)
-			}
-		}
 	}
 }
 
@@ -232,4 +167,68 @@ func writeWorkerMutex(id int, dataN, workerN int) {
 		lock.Unlock()
 	}
 	wg.Done()
+}
+
+func Benchmark_100_50_10_10(b *testing.B) {
+	doBenchTest(b, 100, 10, 10, 50, true, false)
+}
+func Benchmark_100_20_10_10(b *testing.B) {
+	doBenchTest(b, 100, 10, 10, 20, true, false)
+}
+func Benchmark_100_5_10_10(b *testing.B) {
+	doBenchTest(b, 100, 10, 10, 5, true, false)
+}
+func Benchmark_100_20_2_2(b *testing.B) {
+	doBenchTest(b, 100, 2, 2, 20, true, false)
+}
+func Benchmark_100_20_5_5(b *testing.B) {
+	doBenchTest(b, 100, 5, 5, 20, true, false)
+}
+func Benchmark_10000_50_50_50(b *testing.B) {
+	doBenchTest(b, 10000, 50, 50, 50, true, false)
+}
+
+/////////////////////////////////////
+
+func Benchmark_100_50_10_10_lock(b *testing.B) {
+	doBenchTest(b, 100, 10, 10, 50, true, true)
+}
+func Benchmark_100_20_10_10_lock(b *testing.B) {
+	doBenchTest(b, 100, 10, 10, 20, true, true)
+}
+func Benchmark_100_5_10_10_lock(b *testing.B) {
+	doBenchTest(b, 100, 10, 10, 5, true, true)
+}
+func Benchmark_100_20_2_2_lock(b *testing.B) {
+	doBenchTest(b, 100, 2, 2, 20, true, true)
+}
+func Benchmark_100_20_5_5_lock(b *testing.B) {
+	doBenchTest(b, 100, 5, 5, 20, true, true)
+}
+func Benchmark_10000_50_50_50_lock(b *testing.B) {
+	doBenchTest(b, 10000, 50, 50, 50, true, true)
+}
+
+func doBenchTest(b *testing.B, dataN, r, w int, _buffLen int, sync bool, lock bool) {
+	for i := 0; i < b.N; i++ {
+		if sync {
+			ringBuffer.Init(_buffLen)
+			for i := 0; i < r; i++ {
+				wg.Add(1)
+				go readeWorker(i, dataN, r, lock)
+			}
+			for i := 0; i < w; i++ {
+				wg.Add(1)
+				go writeWorker(i, dataN, w, lock)
+			}
+			wg.Wait()
+		} else {
+			for i := 0; i < r; i++ {
+				readeWorker(i, dataN, r, lock)
+			}
+			for i := r; i < r+w; i++ {
+				writeWorker(i, dataN, w, lock)
+			}
+		}
+	}
 }

@@ -1,4 +1,8 @@
-// this file implements proc synchronization function for sync.WaitList
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// this file implements proc synchronization functions for sync.WaitList
 
 package runtime
 
@@ -75,6 +79,10 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 
 	// Harder case: search for a waiter and wake it.
 	lock(&root.lock)
+	if atomic.Load(awakeSem) == 0 {
+		unlock(&root.lock)
+		return
+	}
 	num := root.dequeuePriority(awakeSem, priority)
 	if num > 0 {
 		atomic.Xadd(&root.nwait, -num)
@@ -281,6 +289,7 @@ Found:
 	return
 }
 
+// GetGoroutineId returns ID of current goroutine.
 func GetGoroutineId() int64 {
 	return getg().goid
 }
