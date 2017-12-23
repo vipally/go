@@ -31,7 +31,7 @@ const (
 	noVerbString      = "%!(NOVERB)"
 	invReflectString  = "<invalid reflect.Value>"
 
-	maxArrayElemInLine = 10 //in "%##v" "%++v" format, while array too long, put a new line
+	maxArrayElemInLine = 10 //in pretty style(flag "@"), while array too long, put a new line
 )
 
 // State represents the printer state passed to custom formatters.
