@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	dataCnt = 1000
+	dataCnt = 100
 	buffLen = 20
 	rCnt    = 2
 	wCnt    = 2
@@ -21,7 +21,8 @@ var (
 	ringBuffer = NewRingBuffer(buffLen)
 	wg         WaitGroup
 	lock       RWMutex
-	isDebug    = false
+
+	isDebug = true
 )
 
 func init() {
@@ -66,9 +67,11 @@ func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool
 func Benchmark_100_50_10_10(b *testing.B) {
 	doBenchTest(b, 100, 10, 10, 50, true, false)
 }
+
 func Benchmark_100_20_10_10(b *testing.B) {
 	doBenchTest(b, 100, 10, 10, 20, true, false)
 }
+
 func Benchmark_100_5_10_10(b *testing.B) {
 	doBenchTest(b, 100, 10, 10, 5, true, false)
 }
@@ -78,30 +81,31 @@ func Benchmark_100_20_2_2(b *testing.B) {
 func Benchmark_100_20_5_5(b *testing.B) {
 	doBenchTest(b, 100, 5, 5, 20, true, false)
 }
+
 func Benchmark_10000_50_50_50(b *testing.B) {
 	doBenchTest(b, 10000, 50, 50, 50, true, false)
 }
 
-/////////////////////////////////////
+///////////////////////////////////////
 
-func Benchmark_100_50_10_10_lock(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 50, true, true)
-}
-func Benchmark_100_20_10_10_lock(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 20, true, true)
-}
-func Benchmark_100_5_10_10_lock(b *testing.B) {
-	doBenchTest(b, 100, 10, 10, 5, true, true)
-}
-func Benchmark_100_20_2_2_lock(b *testing.B) {
-	doBenchTest(b, 100, 2, 2, 20, true, true)
-}
-func Benchmark_100_20_5_5_lock(b *testing.B) {
-	doBenchTest(b, 100, 5, 5, 20, true, true)
-}
-func Benchmark_10000_50_50_50_lock(b *testing.B) {
-	doBenchTest(b, 10000, 50, 50, 50, true, true)
-}
+//func Benchmark_100_50_10_10_lock(b *testing.B) {
+//	doBenchTest(b, 100, 10, 10, 50, true, true)
+//}
+//func Benchmark_100_20_10_10_lock(b *testing.B) {
+//	doBenchTest(b, 100, 10, 10, 20, true, true)
+//}
+//func Benchmark_100_5_10_10_lock(b *testing.B) {
+//	doBenchTest(b, 100, 10, 10, 5, true, true)
+//}
+//func Benchmark_100_20_2_2_lock(b *testing.B) {
+//	doBenchTest(b, 100, 2, 2, 20, true, true)
+//}
+//func Benchmark_100_20_5_5_lock(b *testing.B) {
+//	doBenchTest(b, 100, 5, 5, 20, true, true)
+//}
+//func Benchmark_10000_50_50_50_lock(b *testing.B) {
+//	doBenchTest(b, 10000, 50, 50, 50, true, true)
+//}
 
 func doBenchTest(b *testing.B, dataN, r, w int, _buffLen int, sync bool, lock bool) {
 	for i := 0; i < b.N; i++ {

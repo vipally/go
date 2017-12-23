@@ -7,6 +7,10 @@ import (
 	"unsafe"
 )
 
+const (
+	isDebug = true
+)
+
 //type of goroutin priority
 type priorityType = uint64
 
@@ -41,13 +45,16 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, nee
 	s.acquiretime = 0
 	s.ticket = 0
 	// Add ourselves to nwait to disable "easy case" in semrelease.
+	root.debugShowList(waitSem, "wait before queue")
 	atomic.Xadd(&root.nwait, 1)
 	atomic.Xadd(waitSem, 1)
 	root.queuePriority(waitSem, s, priority)
+	root.debugShowList(waitSem, "wait after queue")
 
 	unlock(&root.lock)
-
 	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
+	//goparkunlock(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4)
+
 	releaseSudog(s)
 }
 
@@ -75,15 +82,80 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 
 	// Harder case: search for a waiter and wake it.
 	lock(&root.lock)
+	root.debugShowList(awakeSem, "awake before dequeue")
 	num := root.dequeuePriority(awakeSem, priority)
 	if num > 0 {
 		atomic.Xadd(&root.nwait, -num)
 		atomic.Xadd(awakeSem, -num)
 	}
+	root.debugShowList(awakeSem, "awake after dequeue")
+
+	if isDebug {
+		println("=========wakeup", awakeSem, priority, num)
+	}
 	unlock(&root.lock)
 }
 
-// queuePriority adds s to the blocked goroutines list on addr by priority.
+func (root *semaRoot) debugShowList(sem *uint32, title string) {
+	if isDebug {
+		n := atomic.Load(sem)
+		println("debugShowList", n, sem, title, 0)
+		ps := &root.treap
+		s := *ps
+		for elem := uintptr(unsafe.Pointer(sem)); s != nil; s = *ps {
+			if s.elem == unsafe.Pointer(sem) {
+				goto Found
+			}
+			if elem < uintptr(s.elem) {
+				ps = &s.prev
+			} else {
+				ps = &s.next
+			}
+		}
+
+		if n > 0 && title != "semroot" {
+			println("============waitlist len not match", sem, n, 0)
+			root.debugShowAddrs(root.treap, sem, title, 0)
+			throw("list len not match")
+		}
+		return //do not found
+
+	Found:
+		cnt := uint32(0)
+		for p := s; p != nil; p = p.waitlink {
+			println("    ", p.g.goid, p.priority)
+			cnt++
+		}
+		if cnt != n && title != "semroot" {
+			println("============waitlist len not match", sem, n, cnt)
+			root.debugShowAddrs(root.treap, sem, title, 0)
+			throw("list len not match")
+		}
+	}
+}
+
+func (root *semaRoot) debugShowAddrs(s *sudog, sem *uint32, title string, depth int) {
+	if isDebug {
+		if depth == 0 {
+			println("debugShowAddrs", s, sem, title)
+		}
+
+		if s != nil {
+			linehead := ""
+			for i := 0; i <= depth; i++ {
+				linehead += "  "
+			}
+			println(linehead, s.elem, s.ticket, s.priority, title)
+			if s.elem == unsafe.Pointer(sem) {
+				println(linehead, "====have find it", s.elem, s.ticket, s.priority, title)
+			}
+			root.debugShowAddrs(s.prev, sem, title, depth+1)
+			root.debugShowAddrs(s.next, sem, title, depth+1)
+		}
+	}
+}
+
+// queue adds s to the blocked goroutines in semaRoot with priority.
 // refer semaRoot.queue
 func (root *semaRoot) queuePriority(addr *uint32, s *sudog, priority priorityType) {
 	s.g = getg()
@@ -209,6 +281,10 @@ Found:
 		n = p.waitlink
 		num++
 
+		if isDebug {
+			println("====wakeup", addr, priority, p.g.goid, p.priority)
+		}
+
 		p.parent = nil
 		p.elem = nil
 		p.next = nil
@@ -263,6 +339,11 @@ Found:
 				root.treap = nil
 			}
 		}
+
+		if isDebug {
+			println("====wakeup", addr, priority, s.g.goid, s.priority)
+		}
+
 		s.parent = nil
 		s.elem = nil
 		s.next = nil
