@@ -1,7 +1,16 @@
+# Ally master branch
+changlist from Official:
+- 
+- [proposal: runtime, time: add API BuildTimestamp to report an application's build time](https://github.com/vipally/go/issues/1)
+
+******
+
+
 # The Go Programming Language
 
 Go is an open source programming language that makes it easy to build simple,
 reliable, and efficient software.
+
 
 ![Gopher image](doc/gopher/fiveyears.jpg)
 *Gopher image by [Renee French][rf], licensed under [Creative Commons 3.0 Attributions license][cc3-by].*
