@@ -10,11 +10,13 @@ import (
 )
 
 const (
-	dataCnt = 100
-	buffLen = 20
-	rCnt    = 2
-	wCnt    = 2
+	dataCnt = 1000
+	buffLen = 40
+	rCnt    = 1
+	wCnt    = 1
 	delayT  = 5000
+
+	isDebug = false
 )
 
 var (
@@ -22,8 +24,74 @@ var (
 	wg         WaitGroup
 	lock       RWMutex
 
-	isDebug = true
+	chData = make(chan int, buffLen)
 )
+
+type workerType byte
+
+const (
+	workerMutex workerType = iota
+	workerCh
+	workerRingBuffer
+)
+
+func (w workerType) String() string {
+	switch w {
+	case workerMutex:
+		return "workerMutex"
+	case workerCh:
+		return "workerCh"
+	case workerRingBuffer:
+		return "workerRingBuffer"
+	}
+	panic("unknown worker")
+}
+
+func (w workerType) readWorker(id int, dataN, workerN int) {
+	if isDebug {
+		println("create readWorker", id, "goid", runtime.GetGoroutineId(), w.String())
+	}
+	id = int(runtime.GetGoroutineId())
+	defer wg.Done()
+
+	if dataN%workerN != 0 {
+		panic("dataN%workerN != 0")
+	}
+
+	switch w {
+	case workerMutex:
+		readWorkerMutex(id, dataCnt, workerN)
+	case workerCh:
+		readWorkerCh(id, dataCnt, workerN)
+	case workerRingBuffer:
+		readWorkerRB(id, dataCnt, workerN)
+	}
+	if isDebug {
+		println("writeWorker end", id, "goid", runtime.GetGoroutineId(), w.String())
+	}
+}
+func (w workerType) writeWorker(id int, dataN, workerN int) {
+	if isDebug {
+		println("create readWorker", id, "goid", runtime.GetGoroutineId(), w.String())
+	}
+	id = int(runtime.GetGoroutineId())
+	defer wg.Done()
+
+	if dataN%workerN != 0 {
+		panic("dataN%workerN != 0")
+	}
+	switch w {
+	case workerMutex:
+		writeWorkerMutex(id, dataCnt, workerN)
+	case workerCh:
+		writeWorkerCh(id, dataCnt, workerN)
+	case workerRingBuffer:
+		writeWorkerRB(id, dataCnt, workerN)
+	}
+	if isDebug {
+		println("writeWorker end", id, "goid", runtime.GetGoroutineId(), w.String())
+	}
+}
 
 func init() {
 	cpuN := runtime.NumCPU()
@@ -35,29 +103,37 @@ func TestRingBuffer(t *testing.T) {
 	if true {
 		goMAXPROCS := runtime.GOMAXPROCS(0)
 		start := time.Now()
-		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, false)
+		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, workerRingBuffer)
 		dur := time.Now().Sub(start)
-		fmt.Printf("[RingBuffer ]cost time % 12s for %d data, w=%d r=%d avg=%s buffLen=%d GOMAXPROCS=%d\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt), buffLen, goMAXPROCS)
+		fmt.Printf("[RingBuffer   ]cost time % 12s for %d data, w=%d r=%d avg=%s buffLen=%d GOMAXPROCS=%d\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt), buffLen, goMAXPROCS)
 	}
 
 	if true {
 		start := time.Now()
-		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, true)
+		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, workerCh)
 		dur := time.Now().Sub(start)
-		fmt.Printf("[MutexBuffer]cost time % 12s for %d data, w=%d r=%d avg=%s\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt))
+		fmt.Printf("[ChannelBuffer]cost time % 12s for %d data, w=%d r=%d avg=%s\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt))
 	}
+
+	if true {
+		start := time.Now()
+		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, workerMutex)
+		dur := time.Now().Sub(start)
+		fmt.Printf("[MutexBuffer  ]cost time % 12s for %d data, w=%d r=%d avg=%s\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt))
+	}
+
 }
 
-func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool) {
+func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, worker workerType) {
 	if sync {
 		ringBuffer.Init(buffLen)
 		for i := 0; i < r; i++ {
 			wg.Add(1)
-			go readeWorker(i, dataN, r, lock)
+			go worker.readWorker(i, dataN, r)
 		}
 		for i := r; i < r+w; i++ {
 			wg.Add(1)
-			go writeWorker(i, dataN, w, lock)
+			go worker.writeWorker(i, dataN, w)
 		}
 		wg.Wait()
 	} else {
@@ -108,27 +184,27 @@ func Benchmark_10000_50_50_50(b *testing.B) {
 //}
 
 func doBenchTest(b *testing.B, dataN, r, w int, _buffLen int, sync bool, lock bool) {
-	for i := 0; i < b.N; i++ {
-		if sync {
-			ringBuffer.Init(_buffLen)
-			for i := 0; i < r; i++ {
-				wg.Add(1)
-				go readeWorker(i, dataN, r, lock)
-			}
-			for i := 0; i < w; i++ {
-				wg.Add(1)
-				go writeWorker(i, dataN, w, lock)
-			}
-			wg.Wait()
-		} else {
-			for i := 0; i < r; i++ {
-				readeWorker(i, dataN, r, lock)
-			}
-			for i := r; i < r+w; i++ {
-				writeWorker(i, dataN, w, lock)
-			}
-		}
-	}
+	//	for i := 0; i < b.N; i++ {
+	//		if sync {
+	//			ringBuffer.Init(_buffLen)
+	//			for i := 0; i < r; i++ {
+	//				wg.Add(1)
+	//				go readWorker(i, dataN, r, lock)
+	//			}
+	//			for i := 0; i < w; i++ {
+	//				wg.Add(1)
+	//				go writeWorker(i, dataN, w, lock)
+	//			}
+	//			wg.Wait()
+	//		} else {
+	//			for i := 0; i < r; i++ {
+	//				readeWorker(i, dataN, r, lock)
+	//			}
+	//			for i := r; i < r+w; i++ {
+	//				writeWorker(i, dataN, w, lock)
+	//			}
+	//		}
+	//	}
 }
 
 func delay() {
@@ -142,22 +218,8 @@ func delay() {
 	m = m
 }
 
-func readeWorker(id int, dataN, workerN int, lock bool) {
-	if isDebug {
-		println("create readerThread", id, " ", runtime.GetGoroutineId())
-	}
-	id = int(runtime.GetGoroutineId())
+func readWorkerRB(id int, dataN, workerN int) {
 
-	if dataN%workerN != 0 {
-		panic("")
-	}
-
-	if lock {
-		readWorkerMutex(id, dataN, workerN)
-		//wg.Done()
-		return
-	}
-	defer wg.Done()
 	num := dataN / workerN
 	for i := 1; i <= num; i++ {
 		if isDebug {
@@ -173,26 +235,9 @@ func readeWorker(id int, dataN, workerN int, lock bool) {
 			fmt.Printf("[%02d]Reader CommitR %03d  %#v\n", id, idx, ringBuffer)
 		}
 	}
-	if isDebug {
-		println("readerThread end", id, " ", runtime.GetGoroutineId())
-	}
 }
 
-func writeWorker(id int, dataN, workerN int, lock bool) {
-	if isDebug {
-		println("create writerThread", id, " ", runtime.GetGoroutineId())
-	}
-	id = int(runtime.GetGoroutineId())
-
-	if dataN%workerN != 0 {
-		panic("")
-	}
-
-	if lock {
-		writeWorkerMutex(id, dataN, workerN)
-		return
-	}
-	defer wg.Done()
+func writeWorkerRB(id int, dataN, workerN int) {
 	num := dataN / workerN
 	for i := 1; i <= num; i++ {
 		if isDebug {
@@ -213,9 +258,6 @@ func writeWorker(id int, dataN, workerN int, lock bool) {
 			fmt.Printf("[%02d]Writer commit %03d %#v\n", id, idx, ringBuffer)
 		}
 	}
-	if isDebug {
-		println("writerThread end", id, " ", runtime.GetGoroutineId())
-	}
 }
 
 func readWorkerMutex(id int, dataN, workerN int) {
@@ -225,7 +267,6 @@ func readWorkerMutex(id int, dataN, workerN int) {
 		delay()
 		lock.RUnlock()
 	}
-	wg.Done()
 }
 
 func writeWorkerMutex(id int, dataN, workerN int) {
@@ -235,5 +276,19 @@ func writeWorkerMutex(id int, dataN, workerN int) {
 		delay()
 		lock.Unlock()
 	}
-	wg.Done()
+}
+
+func readWorkerCh(id int, dataN, workerN int) {
+	num := dataN / workerN
+	for i := 0; i < num; i++ {
+		<-chData
+		delay()
+	}
+}
+func writeWorkerCh(id int, dataN, workerN int) {
+	num := dataN / workerN
+	for i := 0; i < num; i++ {
+		chData <- i
+		delay()
+	}
 }

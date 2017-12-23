@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	isDebug = true
+	isDebug = false
 )
 
 //type of goroutin priority
