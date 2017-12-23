@@ -358,6 +358,7 @@ func (ctxt *Link) loadlib() {
 	// ctxt.Library grows during the loop, so not a range loop.
 	for i := 0; i < len(ctxt.Library); i++ {
 		lib := ctxt.Library[i]
+		fmt.Printf("lib %d =%+v\n", i, lib)
 		if lib.Shlib == "" {
 			if ctxt.Debugvlog > 1 {
 				ctxt.Logf("%5.2f autolib: %s (from %s)\n", Cputime(), lib.File, lib.Objref)

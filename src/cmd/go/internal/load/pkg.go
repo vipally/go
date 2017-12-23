@@ -446,7 +446,7 @@ func LoadImport(path, srcDir string, parent *Package, stk *ImportStack, importPo
 	stk.Push(stkPath)
 	defer stk.Pop()
 
-	fmt.Printf("LoadImport [%s][%s] pkgSignature=%s vendoredPath=%s\n", path, srcDir, pkgSignature, vendoredPath)
+	fmt.Printf("LoadImport [%s][%s] pkgSignature=%s vendoredPath=%s stkPath=%s\n", path, srcDir, pkgSignature, vendoredPath, stkPath)
 
 	p := packageCache[pkgSignature]
 	if p != nil {
