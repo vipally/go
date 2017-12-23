@@ -80,7 +80,6 @@ func sync_runtime_goAwakeWithPriority(awakeSem *uint32, priority priorityType) {
 		atomic.Xadd(&root.nwait, -num)
 		atomic.Xadd(awakeSem, -num)
 	}
-
 	unlock(&root.lock)
 }
 
