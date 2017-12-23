@@ -51,9 +51,12 @@ func sync_runtime_goWaitWithPriority(waitSem *uint32, priority priorityType, nee
 	root.queuePriority(waitSem, s, priority)
 	root.debugShowList(waitSem, "wait after queue")
 
-	unlock(&root.lock)
-	gopark(nil, nil, "syncWaitList", traceEvGoBlockWaitList, 4)
-	//goparkunlock(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4)
+	//fix a g state error bug:
+	//when g is push in sudog queue
+	//but unlock before gopark
+	//other g may wakeup it before gopark
+	//it will cause gopark status check fail
+	goparkunlock(&root.lock, "syncWaitList", traceEvGoBlockWaitList, 4)
 
 	releaseSudog(s)
 }
