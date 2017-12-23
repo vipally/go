@@ -1332,16 +1332,12 @@ func TestReadFileLimit(t *testing.T) {
 
 func TestBuildTime(t *testing.T) {
 	now := Now()
-	unixNow := runtime.UnixNow()
 	buildTime := BuildTime()
 	buildTimestamp := runtime.BuildTimestamp()
 	dur := now.Sub(buildTime)
 
 	if buildTimestamp != buildTime.Unix() {
 		t.Errorf("BuildTimestamp not match: runtime.BuildTimestamp()=%d time.BuidTime().Unix()=%d", buildTimestamp, buildTime.Unix())
-	}
-	if unixNow != now.Unix() {
-		t.Errorf("UnixNow not match: runtime.UnixNow()=%d time.Now().Unix()=%d", buildTimestamp, buildTime.Unix())
 	}
 	if dur > Minute {
 		t.Errorf("Cost too much duration:%s time.Now()=%s time.BuildTime()=%s", dur, now, buildTime)

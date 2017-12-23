@@ -22,20 +22,6 @@ func BuildTimestamp() int64 {
 	return buildtimestamp
 }
 
-// UnixNow returns the seconds of unix time,
-// which is the same as time.Now().Unix()
-func UnixNow() int64 {
-	sec, nsec, _ := time_now()
-	unixNow := (sec*1e9 + int64(nsec)) / 1e9
-	return unixNow
-}
-
-// UnixNowNano returns accurate of unix time.
-// Which is the same as time.now
-func UnixNowNano() (sec int64, nsec int32, mono int64) {
-	return time_now()
-}
-
 //time.buildtimestamp() which is the same as runtime.BuildTimestamp()
 //go:linkname time_buildtimestamp time.buildtimestamp
 func time_buildtimestamp() int64 {
