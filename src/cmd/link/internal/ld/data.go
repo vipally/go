@@ -43,6 +43,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // isRuntimeDepPkg returns whether pkg is the runtime package or its dependency
@@ -791,6 +792,21 @@ var zeros [512]byte
 
 var strdata []*sym.Symbol
 
+// for write runtime.buildtimestamp, maybe set by command line
+var runtimebuildtimestamp int64 = -1
+
+//write runtime.buildtimestamp
+func writeruntimebuildtimestamp(ctxt *Link) {
+	if runtimebuildtimestamp < 0 {
+		runtimebuildtimestamp = time.Now().Unix()
+	}
+	name := "runtime.buildtimestamp"
+	s := ctxt.Syms.Lookup(name, 0)
+	s.Attr |= sym.AttrReachable
+	s.Type = sym.SRODATA
+	s.AddUint64(ctxt.Arch, uint64(runtimebuildtimestamp))
+}
+
 func addstrdata1(ctxt *Link, arg string) {
 	eq := strings.Index(arg, "=")
 	dot := strings.LastIndex(arg[:eq+1], ".")
@@ -806,6 +822,16 @@ func addstrdata1(ctxt *Link, arg string) {
 }
 
 func addstrdata(ctxt *Link, name string, value string) {
+	//runtime.buildtimestamp int64
+	if name == "runtime.buildtimestamp" {
+		if v, err := strconv.ParseInt(value, 0, 64); err == nil {
+			runtimebuildtimestamp = v //set buidtimestamp by command line
+		} else {
+			Exitf("-X %s=%s error:%s", name, value, err.Error())
+		}
+		return
+	}
+
 	p := fmt.Sprintf("%s.str", name)
 	sp := ctxt.Syms.Lookup(p, 0)
 

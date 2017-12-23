@@ -356,7 +356,7 @@ func (f *File) checkPrintf(call *ast.CallExpr, name string) {
 func (s *formatState) parseFlags() {
 	for s.nbytes < len(s.format) {
 		switch c := s.format[s.nbytes]; c {
-		case '#', '0', '+', '-', ' ':
+		case '#', '0', '+', '-', ' ', '@':
 			s.flags = append(s.flags, c)
 			s.nbytes++
 		default:
@@ -509,7 +509,7 @@ const (
 	noFlag       = ""
 	numFlag      = " -+.0"
 	sharpNumFlag = " -+.0#"
-	allFlags     = " -+.0#"
+	allFlags     = " -+.0#@"
 )
 
 // printVerbs identifies which flags are known to printf for each verb.
@@ -519,6 +519,7 @@ var printVerbs = []printVerb{
 	// '+' is required sign for numbers, Go format for %v.
 	// '#' is alternate format for several verbs.
 	// ' ' is spacer for numbers
+	// '@' print %v as pretty format(a indented-multi-lines style string)
 	{'%', noFlag, 0},
 	{'b', numFlag, argInt | argFloat | argComplex},
 	{'c', "-", argRune | argInt},
@@ -691,7 +692,7 @@ func (f *File) argCanBeChecked(call *ast.CallExpr, formatArg int, state *formatS
 var printFormatRE = regexp.MustCompile(`%` + flagsRE + numOptRE + `\.?` + numOptRE + indexOptRE + verbRE)
 
 const (
-	flagsRE    = `[+\-#]*`
+	flagsRE    = `[+\-#@]*`
 	indexOptRE = `(\[[0-9]+\])?`
 	numOptRE   = `([0-9]+|` + indexOptRE + `\*)?`
 	verbRE     = `[bcdefgopqstvxEFGUX]`

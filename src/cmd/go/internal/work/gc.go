@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"cmd/go/internal/base"
 	"cmd/go/internal/cfg"
@@ -423,11 +424,20 @@ func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) 
 		ldflags = append(ldflags, "-X=runtime/internal/sys.DefaultGoroot="+cfg.GOROOT)
 	}
 
+	//set runtime.buildtimestamp int64 by linker
+	timestamp := int64(0)
+
 	// Store BuildID inside toolchain binaries as a unique identifier of the
 	// tool being run, for use by content-based staleness determination.
 	if root.Package.Goroot && strings.HasPrefix(root.Package.ImportPath, "cmd/") {
 		ldflags = append(ldflags, "-X=cmd/internal/objabi.buildID="+root.buildID)
+	} else {
+		// do not set timestamp for cmd/xxxx
+		// which will cause STALE error when go_bootstrap build
+		timestamp = time.Now().Unix()
 	}
+
+	ldflags = append(ldflags, fmt.Sprintf("-X=runtime.buildtimestamp=%d", timestamp))
 
 	// If the user has not specified the -extld option, then specify the
 	// appropriate linker. In case of C++ code, use the compiler named

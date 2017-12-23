@@ -13,11 +13,15 @@
 	The verbs:
 
 	General:
-		%v	the value in a default format
-			when printing structs, the plus flag (%+v) adds field names
-		%#v	a Go-syntax representation of the value
-		%T	a Go-syntax representation of the type of the value
-		%%	a literal percent sign; consumes no value
+		%v		the value in a default format
+				when printing structs, the plus flag (%+v) adds field names
+		%@v		the value in a default pretty format
+		%#v		a Go-syntax representation of the value
+		%@#v	pretty style of Go-syntax representation of the value(an indented-multi-lines string)
+		%+v		when printing structs, the plus flag (%+v) adds field names.
+		%@+v	pretty style of struct-syntax representation of the value(an indented-multi-lines string)
+		%T		a Go-syntax representation of the type of the value
+		%%		a literal percent sign; consumes no value
 
 	Boolean:
 		%t	the word true or false
@@ -117,6 +121,7 @@
 			write e.g. U+0078 'x' if the character is printable for %U (%#U).
 		' '	(space) leave a space for elided sign in numbers (% d);
 			put spaces between bytes printing strings or slices in hex (% x, % X)
+		@   pretty style for verb %v, which will printing as an indented-multi-lines string.
 		0	pad with leading zeros rather than spaces;
 			for numbers, this moves the padding after the sign
 
