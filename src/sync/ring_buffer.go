@@ -17,7 +17,9 @@ func NewRingBuffer(size int) *RingBuffer {
 
 // RingBuffer is goroutine-safe cycle buffer.
 // It is designed as share buffer with lots of readers and writers.
-// see: http://mechanitis.blogspot.com/2011/06/dissecting-disruptor-whats-so-special.html
+// see:
+//   http://ifeve.com/ringbuffer
+//   http://mechanitis.blogspot.com/2011/06/dissecting-disruptor-whats-so-special.html
 type RingBuffer struct {
 	size int //buffer size, readonly
 

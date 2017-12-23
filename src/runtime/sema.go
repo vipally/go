@@ -197,7 +197,6 @@ func semrelease1(addr *uint32, handoff bool) {
 
 func semroot(addr *uint32) *semaRoot {
 	r := &semtable[(uintptr(unsafe.Pointer(addr))>>3)%semTabSize].root
-	r.debugShowList(addr, "semroot")
 	return r
 }
 

@@ -47,35 +47,9 @@ func TestRingBuffer(t *testing.T) {
 	}
 }
 
-//func TestMutexBuffer(t *testing.T) {
-//	start := time.Now()
-//	doTest(t, dataCnt, rCnt, wCnt, buffLen, true, true)
-//	dur := time.Now().Sub(start)
-//	fmt.Printf("[MutexBuffer]cost time %s for %d data buffLen=%d w/r=%d,%d avg=%s\n", dur, dataCnt, buffLen, wCnt, rCnt, dur/time.Duration(dataCnt))
-//}
-
 func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool) {
 	if sync {
 		ringBuffer.Init(buffLen)
-		//		_w := w
-		//		_r := r
-		//		for i := 0; i < r+w; {
-		//			if _w > 0 {
-		//				wg.Add(1)
-		//				go writerThread(i, dataN, w, lock)
-		//				_w--
-		//				i++
-		//			}
-		//			if _r > 0 {
-		//				wg.Add(1)
-		//				go readerThread(i+1, dataN, r, lock)
-		//				_r--
-		//				i++
-		//			}
-		//			if _w <= 0 && _r <= 0 {
-		//				break
-		//			}
-		//		}
 		for i := 0; i < r; i++ {
 			wg.Add(1)
 			go readerThread(i, dataN, r, lock)
@@ -162,7 +136,6 @@ func delay() {
 		}
 	}
 	m = m
-	//os.Getpid()
 }
 
 func readerThread(id int, dataN, workerN int, lock bool) {
@@ -176,7 +149,7 @@ func readerThread(id int, dataN, workerN int, lock bool) {
 	}
 
 	if lock {
-		readerThreadLock(id, dataN, workerN)
+		readerThreadMutex(id, dataN, workerN)
 		//wg.Done()
 		return
 	}
@@ -195,7 +168,6 @@ func readerThread(id int, dataN, workerN int, lock bool) {
 		if isDebug {
 			fmt.Printf("[%02d]Reader CommitR %03d  %#v\n", id, idx, ringBuffer)
 		}
-		//time.Sleep(time.Nanosecond)
 	}
 	if isDebug {
 		println("readerThread end", id, " ", runtime.GetGoroutineId())
@@ -213,7 +185,7 @@ func writerThread(id int, dataN, workerN int, lock bool) {
 	}
 
 	if lock {
-		writerThreadLock(id, dataN, workerN)
+		writerThreadMutex(id, dataN, workerN)
 		return
 	}
 	defer wg.Done()
@@ -229,7 +201,6 @@ func writerThread(id int, dataN, workerN int, lock bool) {
 
 		delay()
 
-		//time.Sleep(time.Nanosecond)
 		if isDebug {
 			fmt.Printf("[%02d]writerThread CommitW %d %#v\n", id, i, ringBuffer)
 		}
@@ -237,29 +208,26 @@ func writerThread(id int, dataN, workerN int, lock bool) {
 		if isDebug {
 			fmt.Printf("[%02d]Writer commit %03d %#v\n", id, idx, ringBuffer)
 		}
-		//time.Sleep(time.Nanosecond)
 	}
 	if isDebug {
 		println("writerThread end", id, " ", runtime.GetGoroutineId())
 	}
 }
 
-func readerThreadLock(id int, dataN, workerN int) {
+func readerThreadMutex(id int, dataN, workerN int) {
 	num := dataN / workerN
 	for i := 0; i < num; i++ {
 		lock.RLock()
-		//time.Sleep(time.Nanosecond)
 		delay()
 		lock.RUnlock()
 	}
 	wg.Done()
 }
 
-func writerThreadLock(id int, dataN, workerN int) {
+func writerThreadMutex(id int, dataN, workerN int) {
 	num := dataN / workerN
 	for i := 0; i < num; i++ {
 		lock.Lock()
-		//time.Sleep(time.Nanosecond)
 		delay()
 		lock.Unlock()
 	}
