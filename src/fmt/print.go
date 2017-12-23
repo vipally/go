@@ -30,8 +30,6 @@ const (
 	badPrecString     = "%!(BADPREC)"
 	noVerbString      = "%!(NOVERB)"
 	invReflectString  = "<invalid reflect.Value>"
-
-	maxArrayElemInLine = 10 //in "%##v" "%++v" format, while array too long, put a new line
 )
 
 // State represents the printer state passed to custom formatters.
@@ -159,8 +157,6 @@ func (p *pp) Flag(b int) bool {
 		return p.fmt.plus || p.fmt.plusV
 	case '#':
 		return p.fmt.sharp || p.fmt.sharpV
-	case '@':
-		return p.fmt.pretty
 	case ' ':
 		return p.fmt.space
 	case '0':
@@ -695,110 +691,6 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 	}
 }
 
-// format a new line, for flag '@' (pretty) only
-func (p *pp) newLineIfRequire(depth int, last bool) bool {
-	if p.fmt.pretty {
-		//if the last line of data set, the depth will decrease
-		if last {
-			depth--
-		}
-		p.buf.WriteByte('\n')
-		for i := 0; i < depth; i++ {
-			p.buf.WriteString("    ")
-		}
-		return true
-	}
-	return false
-}
-
-// check if an array format need a new line
-func (p *pp) arrayRequireNewLine(elemKind reflect.Kind, index, size int) bool {
-	if p.fmt.pretty {
-		switch elemKind {
-		case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct,
-			reflect.String, reflect.Ptr, reflect.Complex64, reflect.Complex128:
-			return true
-		default:
-			//put a new line every maxArrayElemInLine element
-			if index == 0 && size >= maxArrayElemInLine || index > 0 && index%maxArrayElemInLine == 0 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// flag '@' (pretty) only ("%#v" "%+v" optional)
-func (p *pp) extendVflagOnly() bool {
-	return p.fmt.extendVflagOnly()
-}
-
-// write head of a value set(struct, map, slice, array).
-// If v is a nil map/slice, it will return false.
-// Which means the hole data set is finish.
-// Include the first probably new line.
-func (p *pp) writeValueSetHead(v reflect.Value, newLine, empty bool, depth int) bool {
-	switch kind := v.Kind(); kind {
-	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
-		if p.fmt.sharpV { //write type name
-			p.buf.WriteString(v.Type().String())
-			if (kind == reflect.Map || kind == reflect.Slice) && v.IsNil() {
-				p.buf.WriteString(nilParenString)
-				return false
-			}
-		}
-		switch {
-		case kind == reflect.Struct || p.fmt.sharpV:
-			p.buf.WriteByte('{')
-		case kind == reflect.Map:
-			p.buf.WriteString(mapString)
-		default:
-			p.buf.WriteByte('[')
-		}
-	default:
-		//it will never happen except error inner usage, so use panic
-		panic("unknown value set:" + kind.String())
-	}
-	if newLine {
-		// aways increase depth for element,
-		// if empty p.newLineIfRequire will decrease it
-		depth++
-		p.newLineIfRequire(depth, empty)
-	}
-
-	return true
-}
-
-// write element separator in value sets(struct, map, slice, array).
-// element separator includes the probably new line
-func (p *pp) writeElemSeparator(newLine, last bool, depth int) {
-	if p.fmt.sharpV {
-		if !last || newLine && p.fmt.pretty {
-			p.buf.WriteByte(',')
-		}
-	}
-	if !(newLine && p.newLineIfRequire(depth, last)) {
-		if !last {
-			p.buf.WriteByte(' ')
-		}
-	}
-}
-
-// write tail of a value set(struct, map, slice, array)
-func (p *pp) writeValueSetTail(kind reflect.Kind) {
-	switch kind {
-	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
-		if kind == reflect.Struct || p.fmt.sharpV {
-			p.buf.WriteByte('}')
-		} else {
-			p.buf.WriteByte(']')
-		}
-	default:
-		//it will never happen except error inner usage, so use panic
-		panic("unknown value set:" + kind.String())
-	}
-}
-
 // printValue is similar to printArg but starts with a reflect value, not an interface{} value.
 // It does not handle 'p' and 'T' verbs because these should have been already handled by printArg.
 func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
@@ -841,42 +733,68 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 	case reflect.String:
 		p.fmtString(f.String(), verb)
 	case reflect.Map:
-		keys := f.MapKeys()
-		last := len(keys) - 1
-		if !p.writeValueSetHead(f, true, last < 0, depth) {
-			return
+		if p.fmt.sharpV {
+			p.buf.WriteString(f.Type().String())
+			if f.IsNil() {
+				p.buf.WriteString(nilParenString)
+				return
+			}
+			p.buf.WriteByte('{')
+		} else {
+			p.buf.WriteString(mapString)
 		}
+		keys := f.MapKeys()
 		for i, key := range keys {
+			if i > 0 {
+				if p.fmt.sharpV {
+					p.buf.WriteString(commaSpaceString)
+				} else {
+					p.buf.WriteByte(' ')
+				}
+			}
 			p.printValue(key, verb, depth+1)
 			p.buf.WriteByte(':')
-			if p.extendVflagOnly() {
-				p.buf.WriteByte(' ')
-			}
 			p.printValue(f.MapIndex(key), verb, depth+1)
-			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' ' or newLine
 		}
-		p.writeValueSetTail(f.Kind())
-
+		if p.fmt.sharpV {
+			p.buf.WriteByte('}')
+		} else {
+			p.buf.WriteByte(']')
+		}
 	case reflect.Struct:
-		numField := f.NumField()
-		if !p.writeValueSetHead(f, true, numField == 0, depth) {
-			return
+		if p.fmt.sharpV {
+			p.buf.WriteString(f.Type().String())
 		}
-		for i, last := 0, numField-1; i < numField; i++ {
+		p.buf.WriteByte('{')
+		for i := 0; i < f.NumField(); i++ {
+			if i > 0 {
+				if p.fmt.sharpV {
+					p.buf.WriteString(commaSpaceString)
+				} else {
+					p.buf.WriteByte(' ')
+				}
+			}
 			if p.fmt.plusV || p.fmt.sharpV {
 				if name := f.Type().Field(i).Name; name != "" {
 					p.buf.WriteString(name)
 					p.buf.WriteByte(':')
-					if p.extendVflagOnly() {
-						p.buf.WriteByte(' ')
-					}
 				}
 			}
 			p.printValue(getField(f, i), verb, depth+1)
-			p.writeElemSeparator(true, i == last, depth+1) // commaSpaceString or ' ' or newLine
 		}
-		p.writeValueSetTail(f.Kind())
-
+		p.buf.WriteByte('}')
+	case reflect.Interface:
+		value := f.Elem()
+		if !value.IsValid() {
+			if p.fmt.sharpV {
+				p.buf.WriteString(f.Type().String())
+				p.buf.WriteString(nilParenString)
+			} else {
+				p.buf.WriteString(nilAngleString)
+			}
+		} else {
+			p.printValue(value, verb, depth+1)
+		}
 	case reflect.Array, reflect.Slice:
 		switch verb {
 		case 's', 'q', 'x', 'X':
@@ -900,33 +818,30 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 				p.fmtBytes(bytes, verb, t.String())
 				return
 			}
-			fallthrough
-		default:
-			size, elemKind := f.Len(), f.Type().Elem().Kind()
-			firstNewLine := p.arrayRequireNewLine(elemKind, 0, size)
-			if !p.writeValueSetHead(f, firstNewLine, size == 0, depth) {
+		}
+		if p.fmt.sharpV {
+			p.buf.WriteString(f.Type().String())
+			if f.Kind() == reflect.Slice && f.IsNil() {
+				p.buf.WriteString(nilParenString)
 				return
 			}
-			for i, last := 0, size-1; i < size; i++ {
+			p.buf.WriteByte('{')
+			for i := 0; i < f.Len(); i++ {
+				if i > 0 {
+					p.buf.WriteString(commaSpaceString)
+				}
 				p.printValue(f.Index(i), verb, depth+1)
-				isLast := i == last
-				newLine := firstNewLine && isLast || p.arrayRequireNewLine(elemKind, i+1, size)
-				p.writeElemSeparator(newLine, isLast, depth+1) // commaSpaceString or ' ' or newLine
 			}
-			p.writeValueSetTail(f.Kind())
-		}
-
-	case reflect.Interface:
-		value := f.Elem()
-		if !value.IsValid() {
-			if p.fmt.sharpV {
-				p.buf.WriteString(f.Type().String())
-				p.buf.WriteString(nilParenString)
-			} else {
-				p.buf.WriteString(nilAngleString)
-			}
+			p.buf.WriteByte('}')
 		} else {
-			p.printValue(value, verb, depth+1)
+			p.buf.WriteByte('[')
+			for i := 0; i < f.Len(); i++ {
+				if i > 0 {
+					p.buf.WriteByte(' ')
+				}
+				p.printValue(f.Index(i), verb, depth+1)
+			}
+			p.buf.WriteByte(']')
 		}
 	case reflect.Ptr:
 		// pointer to array or slice or struct? ok at top level
@@ -935,7 +850,7 @@ func (p *pp) printValue(value reflect.Value, verb rune, depth int) {
 			switch a := f.Elem(); a.Kind() {
 			case reflect.Array, reflect.Slice, reflect.Struct, reflect.Map:
 				p.buf.WriteByte('&')
-				p.printValue(a, verb, depth) //pointer do not increase depth
+				p.printValue(a, verb, depth+1)
 				return
 			}
 		}
@@ -1068,8 +983,6 @@ formatLoop:
 				p.fmt.zero = !p.fmt.minus // Only allow zero padding to the left.
 			case '+':
 				p.fmt.plus = true
-			case '@': //pretty flag
-				p.fmt.pretty = true
 			case '-':
 				p.fmt.minus = true
 				p.fmt.zero = false // Do not pad with zeros to the right.
@@ -1083,7 +996,6 @@ formatLoop:
 						// Go syntax
 						p.fmt.sharpV = p.fmt.sharp
 						p.fmt.sharp = false
-
 						// Struct-field syntax
 						p.fmt.plusV = p.fmt.plus
 						p.fmt.plus = false
@@ -1179,7 +1091,6 @@ formatLoop:
 			// Go syntax
 			p.fmt.sharpV = p.fmt.sharp
 			p.fmt.sharp = false
-
 			// Struct-field syntax
 			p.fmt.plusV = p.fmt.plus
 			p.fmt.plus = false
