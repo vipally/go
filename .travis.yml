@@ -5,5 +5,6 @@ go:
 before_install:
 
 script:
+  - export GOROOT_BOOTSTRAP=$GOROOT
   - cd src
-  - all.bash
+  - make.bash

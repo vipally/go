@@ -1,4 +1,4 @@
-# Ally master branch
+# Ally master branch ![Version][version-img] [![Build status][travis-img]][travis-url]
 changlist from Official:
 - 
 - [proposal: runtime, time: add API BuildTimestamp to report an application's build time](https://github.com/vipally/go/issues/1)
@@ -52,3 +52,6 @@ questions about the Go language.
 
 [rf]: https://reneefrench.blogspot.com/
 [cc3-by]: https://creativecommons.org/licenses/by/3.0/
+[travis-img]: https://travis-ci.org/vipally/go.svg?branch=ally_master
+[travis-url]: https://travis-ci.org/vipally/go
+[version-img]: https://img.shields.io/badge/version-1.9.0-green.svg
