@@ -52,11 +52,11 @@ func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool
 		ringBuffer.Init(buffLen)
 		for i := 0; i < r; i++ {
 			wg.Add(1)
-			go readerThread(i, dataN, r, lock)
+			go readeWorker(i, dataN, r, lock)
 		}
 		for i := r; i < r+w; i++ {
 			wg.Add(1)
-			go writerThread(i, dataN, w, lock)
+			go writeWorker(i, dataN, w, lock)
 		}
 		wg.Wait()
 	} else {
@@ -109,19 +109,19 @@ func doBenchTest(b *testing.B, dataN, r, w int, _buffLen int, sync bool, lock bo
 			ringBuffer.Init(_buffLen)
 			for i := 0; i < r; i++ {
 				wg.Add(1)
-				go readerThread(i, dataN, r, lock)
+				go readeWorker(i, dataN, r, lock)
 			}
 			for i := 0; i < w; i++ {
 				wg.Add(1)
-				go writerThread(i, dataN, w, lock)
+				go writeWorker(i, dataN, w, lock)
 			}
 			wg.Wait()
 		} else {
 			for i := 0; i < r; i++ {
-				readerThread(i, dataN, r, lock)
+				readeWorker(i, dataN, r, lock)
 			}
 			for i := r; i < r+w; i++ {
-				writerThread(i, dataN, w, lock)
+				writeWorker(i, dataN, w, lock)
 			}
 		}
 	}
@@ -138,7 +138,7 @@ func delay() {
 	m = m
 }
 
-func readerThread(id int, dataN, workerN int, lock bool) {
+func readeWorker(id int, dataN, workerN int, lock bool) {
 	if isDebug {
 		println("create readerThread", id, " ", runtime.GetGoroutineId())
 	}
@@ -149,7 +149,7 @@ func readerThread(id int, dataN, workerN int, lock bool) {
 	}
 
 	if lock {
-		readerThreadMutex(id, dataN, workerN)
+		readWorkerMutex(id, dataN, workerN)
 		//wg.Done()
 		return
 	}
@@ -174,7 +174,7 @@ func readerThread(id int, dataN, workerN int, lock bool) {
 	}
 }
 
-func writerThread(id int, dataN, workerN int, lock bool) {
+func writeWorker(id int, dataN, workerN int, lock bool) {
 	if isDebug {
 		println("create writerThread", id, " ", runtime.GetGoroutineId())
 	}
@@ -185,7 +185,7 @@ func writerThread(id int, dataN, workerN int, lock bool) {
 	}
 
 	if lock {
-		writerThreadMutex(id, dataN, workerN)
+		writeWorkerMutex(id, dataN, workerN)
 		return
 	}
 	defer wg.Done()
@@ -214,7 +214,7 @@ func writerThread(id int, dataN, workerN int, lock bool) {
 	}
 }
 
-func readerThreadMutex(id int, dataN, workerN int) {
+func readWorkerMutex(id int, dataN, workerN int) {
 	num := dataN / workerN
 	for i := 0; i < num; i++ {
 		lock.RLock()
@@ -224,7 +224,7 @@ func readerThreadMutex(id int, dataN, workerN int) {
 	wg.Done()
 }
 
-func writerThreadMutex(id int, dataN, workerN int) {
+func writeWorkerMutex(id int, dataN, workerN int) {
 	num := dataN / workerN
 	for i := 0; i < num; i++ {
 		lock.Lock()

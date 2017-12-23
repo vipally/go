@@ -56,8 +56,8 @@ func (cc checkConflict) needblock() bool {
 
 // Init ringbuffer with size
 func (rb *RingBuffer) Init(size int) {
-	if runtime.GOMAXPROCS(0) <= 1 {
-		panic("RingBuffer: use only when runtime.GOMAXPROCS > 1")
+	if runtime.GOMAXPROCS(0) < 4 {
+		panic("RingBuffer: requires parallelism(runtime.GOMAXPROCS >= 4)")
 	}
 	if size <= 0 {
 		panic("RingBuffer: invalid size")
@@ -94,7 +94,7 @@ func (rb *RingBuffer) ReserveW() (id uint64) {
 		if isDebug {
 			println("go", runtime.GetGoroutineId(), id, "ReserveW wait rCommit", &rb.wlWriter.sema, rb.rCommit, id-uint64(rb.size)+1, dataStart, maxW)
 		}
-		rb.wlWriter.Wait(PriorityFirst, cc.init(&rb.rCommit, id-uint64(rb.size)+1).needblock)
+		rb.wlWriter.Wait(id-uint64(rb.size)+2, cc.init(&rb.rCommit, id-uint64(rb.size)+1).needblock)
 		if isDebug {
 			println("go", runtime.GetGoroutineId(), id, "ReserveW wait end", rb.rCommit, id-uint64(rb.size)+1, dataStart, maxW)
 		}
@@ -157,7 +157,7 @@ func (rb *RingBuffer) ReserveR() (id uint64) {
 		if isDebug {
 			println("go", runtime.GetGoroutineId(), id, "ReserveR wait wCommit", &rb.wlReader.sema, rb.wCommit, id+1)
 		}
-		rb.wlReader.Wait(PriorityFirst, cc.init(&rb.wCommit, id+1).needblock)
+		rb.wlReader.Wait(id+2, cc.init(&rb.wCommit, id+1).needblock)
 		if isDebug {
 			println("go", runtime.GetGoroutineId(), id, "ReserveR wait end", rb.wCommit, id+1)
 		}
