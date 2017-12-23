@@ -1,6 +1,6 @@
 # Ally master branch ![Version][version-img] [![Build status][travis-img]][travis-url]
 changlist from Official:
-- 
+- [#2: fmt: add flag "@" to format a verb "v" value with pretty style(indented-multi-lines) string](https://github.com/vipally/go/issues/2)
 - [#1: runtime, time: add API BuildTimestamp to report an application's build time](https://github.com/vipally/go/issues/1)
   - [func runtime.BuildTimestamp() int64](https://github.com/vipally/go/blob/ally_master/src/runtime/time.go#L21)
   - [func time.BuildTime() time.Time](https://github.com/vipally/go/blob/ally_master/src/time/time.go#L1517)

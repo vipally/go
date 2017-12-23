@@ -356,7 +356,7 @@ func (f *File) checkPrintf(call *ast.CallExpr, name string) {
 func (s *formatState) parseFlags() {
 	for s.nbytes < len(s.format) {
 		switch c := s.format[s.nbytes]; c {
-		case '#', '0', '+', '-', ' ':
+		case '#', '0', '+', '-', ' ', '@':
 			s.flags = append(s.flags, c)
 			s.nbytes++
 		default:
