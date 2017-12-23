@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	dataCnt = 500
-	buffLen = 100
+	dataCnt = 1000
+	buffLen = 20
 	rCnt    = 2
 	wCnt    = 2
-	delayT  = 10000
+	delayT  = 5000
 )
 
 var (
@@ -26,23 +26,33 @@ var (
 
 func init() {
 	cpuN := runtime.NumCPU()
-	fmt.Println("GOMAXPROCS", cpuN)
+	//fmt.Println("GOMAXPROCS", cpuN)
 	runtime.GOMAXPROCS(cpuN)
 }
 
 func TestRingBuffer(t *testing.T) {
-	start := time.Now()
-	doTest(t, dataCnt, rCnt, wCnt, buffLen, true, false)
-	dur := time.Now().Sub(start)
-	fmt.Printf("[lockfree]cost time %s for %d data buffLen=%d w/r=%d,%d avg=%s\n", dur, dataCnt, buffLen, wCnt, rCnt, dur/time.Duration(dataCnt))
+	if true {
+		goMAXPROCS := runtime.GOMAXPROCS(0)
+		start := time.Now()
+		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, false)
+		dur := time.Now().Sub(start)
+		fmt.Printf("[RingBuffer ]cost time % 12s for %d data, w=%d r=%d avg=%s buffLen=%d GOMAXPROCS=%d\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt), buffLen, goMAXPROCS)
+	}
+
+	if true {
+		start := time.Now()
+		doTest(t, dataCnt, rCnt, wCnt, buffLen, true, true)
+		dur := time.Now().Sub(start)
+		fmt.Printf("[MutexBuffer]cost time % 12s for %d data, w=%d r=%d avg=%s\n", dur, dataCnt, wCnt, rCnt, dur/time.Duration(dataCnt))
+	}
 }
 
-func TestCycleBufferLock(t *testing.T) {
-	start := time.Now()
-	doTest(t, dataCnt, rCnt, wCnt, buffLen, true, true)
-	dur := time.Now().Sub(start)
-	fmt.Printf("[lock]cost time %s for %d data buffLen=%d w/r=%d,%d avg=%s\n", dur, dataCnt, buffLen, wCnt, rCnt, dur/time.Duration(dataCnt))
-}
+//func TestMutexBuffer(t *testing.T) {
+//	start := time.Now()
+//	doTest(t, dataCnt, rCnt, wCnt, buffLen, true, true)
+//	dur := time.Now().Sub(start)
+//	fmt.Printf("[MutexBuffer]cost time %s for %d data buffLen=%d w/r=%d,%d avg=%s\n", dur, dataCnt, buffLen, wCnt, rCnt, dur/time.Duration(dataCnt))
+//}
 
 func doTest(t *testing.T, dataN, r, w int, _buffLen uint32, sync bool, lock bool) {
 	if sync {
