@@ -294,7 +294,7 @@ func (f FlexObject) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON copy data into field Raw.
 func (f *FlexObject) UnmarshalJSON(data []byte) error {
-	v.Raw = append(f.Raw[0:0], data...)
+	f.Raw = append(f.Raw[0:0], data...)
 	return nil
 }
 
