@@ -283,7 +283,7 @@ var _ Unmarshaler = (*RawMessage)(nil)
 // It implements Marshaler and Unmarshaler and can delay JSON decoding
 // from field Raw to field D and can direct encoding from field D.
 type FlexObject struct {
-	Raw []byte      // raw bytes for delay JSON decoding
+	Raw []byte      // raw bytes for delay JSON decoding into field D
 	D   interface{} // flex object for JSON encoding
 }
 
