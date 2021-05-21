@@ -281,10 +281,9 @@ var _ Unmarshaler = (*RawMessage)(nil)
 
 // FlexObject is an object that can encoding/decoding JSON between flex Go types.
 // It implements Marshaler and Unmarshaler and can delay JSON decoding
-// from field Raw to field D and can direct encoding from field D.
+// from []byte into flex object.
 type FlexObject struct {
-	Raw []byte      // raw bytes for delay JSON decoding into field D
-	D   interface{} // flex object for JSON encoding
+	D interface{} // flex object for JSON encoding and decoding
 }
 
 // MarshalJSON encoding field D as JSON.
@@ -292,9 +291,9 @@ func (f FlexObject) MarshalJSON() ([]byte, error) {
 	return Marshal(f.D)
 }
 
-// UnmarshalJSON copy data into field Raw.
+// UnmarshalJSON copy data into field D.
 func (f *FlexObject) UnmarshalJSON(data []byte) error {
-	f.Raw = append(f.Raw[0:0], data...)
+	f.D = append([]byte(nil), data...)
 	return nil
 }
 
