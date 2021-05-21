@@ -297,6 +297,20 @@ func (f *FlexObject) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// DelayedUnmarshalJSON unmarshal []byte into instance d.
+// It will update field D if unmarshal OK.
+func (f *FlexObject) DelayedUnmarshalJSON(d interface{}) error {
+	b, ok := f.D.([]byte)
+	if !ok {
+		return errors.New("json.FlexObject: DelayedUnmarshalJSON on none []byte type")
+	}
+	if err := Unmarshal(b, d); err != nil {
+		return err
+	}
+	f.D = d
+	return nil
+}
+
 var _ Marshaler = (*FlexObject)(nil)
 var _ Unmarshaler = (*FlexObject)(nil)
 
