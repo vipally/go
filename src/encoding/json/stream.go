@@ -302,7 +302,7 @@ func (f *FlexObject) UnmarshalJSON(data []byte) error {
 func (f *FlexObject) DelayedUnmarshalJSON(d interface{}) error {
 	b, ok := f.D.([]byte)
 	if !ok {
-		return errors.New("json.FlexObject: DelayedUnmarshalJSON on none []byte type")
+		return errors.New("json.FlexObject: DelayedUnmarshalJSON on none []byte value")
 	}
 	if err := Unmarshal(b, d); err != nil {
 		return err
